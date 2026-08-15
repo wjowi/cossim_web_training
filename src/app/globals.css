@@ -1,0 +1,49 @@
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import '../../src/style/css/feather.css';
+@import '../../src/style/css/line-awesome.min.css';
+@import '../../src/style/icons/fontawesome/css/fontawesome.min.css';
+@import '../../src/style/icons/fontawesome/css/all.min.css';
+
+body {
+  background-color: #FFF5F5 !important;
+}
+/* Chart loading state */
+.chart-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 320px;
+  color: #666;
+  font-style: italic;
+}
+
+/* Fix dropdown clipping in Ant Design tables */
+.ant-table {
+  overflow: visible !important;
+}
+
+.ant-table-container {
+  overflow: visible !important;
+}
+
+.ant-table-content {
+  min-height: 50vh !important;
+  overflow: visible !important;
+}
+
+.ant-table-cell {
+  overflow: visible !important;
+}
+
+.ant-table-tbody > tr > td {
+  overflow: visible !important;
+}
+
+.dropdown-menu.show {
+  z-index: 9999 !important;
+}
+
+/* Ensure the date picker calendar renders above sticky table headers */
+.react-datepicker-popper {
+  z-index: 9999 !important;
+}

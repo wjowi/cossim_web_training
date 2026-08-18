@@ -50,8 +50,8 @@ export default function DashboardPage(){
     return groups;
   },[risks]);
   const orderSummaryCards=[
-    ["Total orders",number(readAnalyticsValue(summary,"TotalOrders",202)),"Selected period",Box],
-    ["Active orders",number(readAnalyticsValue(summary,"ActiveOrders",62)),"Currently in progress",Clock3],
+    ["Received from vendor",number(readAnalyticsValue(summary,"TotalOrders",202)),"Selected period",Box],
+    ["In transit",number(readAnalyticsValue(summary,"ActiveOrders",62)),"Currently in progress",Clock3],
     ["Delivered",number(readAnalyticsValue(summary,"DeliveredOrders",120)),`${Number(readAnalyticsValue(summary,"DeliveryRatePercentage",59.4)).toFixed(1)}% delivery rate`,CheckCircle2],
     ["Failed / returned",number(readAnalyticsValue(summary,"FailedOrders",20)),`${Number(readAnalyticsValue(summary,"FailureRatePercentage",9.9)).toFixed(1)}% failure rate`,RotateCcw],
   ];

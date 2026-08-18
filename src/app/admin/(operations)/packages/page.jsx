@@ -539,42 +539,6 @@ const PackagesList = () => {
     }
   };
 
-  const getStatusBadgeClass = (statusCode) => {
-    const code = String(statusCode || "").toUpperCase();
-
-    const statusClasses = {
-      ORDER_CONFIRMED: "badge bg-primary",
-      PICKED_BY_COURIER: "badge bg-info text-dark",
-      RECEIVED_AT_DC: "badge bg-warning text-dark",
-      IN_TRANSIT_TO_DC: "badge bg-primary",
-
-      ASSIGNED_TO_RIDER: "badge bg-secondary",
-      OUT_FOR_DELIVERY: "badge bg-info text-dark",
-      DELIVERED: "badge bg-success",
-      RESCHEDULED: "badge bg-warning text-dark",
-      DELIVERY_ATTEMPT_2: "badge bg-warning text-dark",
-      DELIVERY_ATTEMPT_3: "badge bg-danger",
-      RE_ASSIGNED: "badge bg-secondary",
-
-      RETURN_IN_TRANSIT: "badge bg-warning text-dark",
-      RETURNED_TO_VENDOR: "badge bg-dark",
-
-      PAYMENT_PENDING: "badge bg-warning text-dark",
-      PAYMENT_RECEIVED: "badge bg-success",
-      PAYMENT_FAILED: "badge bg-danger",
-      PAYMENT_WAIVED: "badge bg-secondary",
-
-      ACCEPTED: "badge bg-success",
-      DECLINED: "badge bg-danger",
-
-      EXPRESS: "badge bg-danger",
-      NEXT_DAY: "badge bg-info text-dark",
-      SAME_DAY_CONSOLIDATED: "badge bg-primary",
-    };
-
-    return statusClasses[code] || "badge bg-secondary";
-  };
-
   const formatAmount = (value) => {
     const amount = Number(value || 0);
 
@@ -591,60 +555,42 @@ const PackagesList = () => {
     return Number.isNaN(date.getTime()) ? null : date;
   };
 
+  // Aging = days the order has stayed in the DC since it was added to the system.
+  const getAgingDays = (dateAddedValue) => {
+    const date = formatPackageDate(dateAddedValue);
+    if (!date) return null;
+
+    return Math.max(0, Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)));
+  };
+
+  const formatAgingLabel = (days) => {
+    if (days === null) return "-";
+    if (days === 0) return "Today";
+    return days === 1 ? "1 day" : `${days} days`;
+  };
+
   const columns = [
     {
       title: "Order NO",
       dataIndex: "OrderNO",
-      width: 165,
+      width: 180,
       fixed: "left",
       sorter: (a, b) =>
         getDisplayText(a.OrderNO).localeCompare(getDisplayText(b.OrderNO)),
-      render: (text) => (
-        <TruncatedText
-          value={text}
-          className="fw-semibold text-primary"
-        />
-      ),
-    },
-    {
-      title: "Delivery Type",
-      dataIndex: "DeliveryType",
-      width: 125,
-      sorter: (a, b) =>
-        getDisplayText(a.DeliveryType).localeCompare(
-          getDisplayText(b.DeliveryType)
-        ),
-      render: (text) => (
-        <span className="badge bg-light text-dark border">
-          {getDisplayText(text)}
-        </span>
-      ),
-    },
-    {
-      title: "Sender",
-      dataIndex: "VendorName",
-      width: 180,
-      sorter: (a, b) =>
-        getDisplayText(a.VendorName).localeCompare(
-          getDisplayText(b.VendorName)
-        ),
-      render: (_, record) => (
+      render: (text, record) => (
         <div className="packages-person-cell">
+          <TruncatedText value={text} className="fw-semibold text-primary" />
           <TruncatedText
-            value={record.VendorName || record.SenderCompanyName}
-            className="fw-medium"
-          />
-          <TruncatedText
-            value={record.VendorPhone || record.SenderContactPhone}
+            value={record.StatusName || record.StatusCode}
             className="text-muted small"
           />
         </div>
       ),
     },
     {
-      title: "Receiver",
+      title: "Customer",
       dataIndex: "ReceiverContactName",
-      width: 180,
+      width: 190,
       sorter: (a, b) =>
         getDisplayText(a.ReceiverContactName).localeCompare(
           getDisplayText(b.ReceiverContactName)
@@ -662,207 +608,39 @@ const PackagesList = () => {
         </div>
       ),
     },
-   
-   {
-  title: "Route",
-  dataIndex: "OriginDCName",
-  width: 280,
-  sorter: (a, b) => {
-    const originCompare = getDisplayText(
-      a.OriginDCName
-    ).localeCompare(
-      getDisplayText(b.OriginDCName)
-    );
-
-    if (originCompare !== 0) {
-      return originCompare;
-    }
-
-    return getDisplayText(
-      a.DestinationDCName
-    ).localeCompare(
-      getDisplayText(b.DestinationDCName)
-    );
-  },
-  render: (_, record) => (
-    <div className="packages-route-combined-cell">
-      <div className="packages-route-point">
-        <span className="packages-route-label">
-          
-        </span>
-
-        <div className="packages-route-details">
-          <TruncatedText
-            value={record.OriginDCName}
-            className="fw-medium"
-          />
-
-          <TruncatedText
-            value={record.OriginDCCode}
-            className="text-muted small"
-          />
-        </div>
-      </div>
-
-      <div className="packages-route-arrow">
-        <span aria-hidden="true">→</span>
-      </div>
-
-      <div className="packages-route-point">
-        <span className="packages-route-label">
-          
-        </span>
-
-        <div className="packages-route-details">
-          <TruncatedText
-            value={record.DestinationDCName}
-            className="fw-medium"
-          />
-
-          <TruncatedText
-            value={record.DestinationDCCode}
-            className="text-muted small"
-          />
-        </div>
-      </div>
-    </div>
-  ),
-},
     {
-      title: "Current Location",
-      dataIndex: "LatestLogDCName",
-      width: 180,
-      sorter: (a, b) =>
-        getDisplayText(a.LatestLogDCName).localeCompare(
-          getDisplayText(b.LatestLogDCName)
-        ),
-      render: (_, record) => (
-        <div className="packages-person-cell">
-          <TruncatedText
-            value={
-              record.RouteInfo ||
-              record.InitialLogDCName ||
-              record.OriginDCName
-            }
-            className="fw-medium"
-          />
-          {record.RouteInfo && (
-            <TruncatedText
-              value={record.RouteInfo}
-              className="text-muted small"
-            />
-          )}
-        </div>
-      ),
-    },
-    {
-      title: "Service Fee",
-      dataIndex: "ServiceFee",
-      width: 120,
-      align: "right",
-      sorter: (a, b) =>
-        Number(a.ServiceFee || 0) - Number(b.ServiceFee || 0),
-      render: (value) => (
-        <span className="fw-semibold">
-          {formatAmount(value)}
-        </span>
-      ),
-    },
-    {
-      title: "COD",
+      title: "COD Amount",
       dataIndex: "CODAmount",
-      width: 110,
+      width: 130,
       align: "right",
       sorter: (a, b) =>
         Number(a.CODAmount || 0) - Number(b.CODAmount || 0),
-      render: (value, record) => (
-        <div className="packages-amount-cell">
-          <div>{formatAmount(value)}</div>
-          <small className="text-muted">
-            {record.CashOnDeliveryRequired ? "Required" : "Not required"}
-          </small>
-        </div>
-      ),
-    },
-    {
-      title: "Pickup",
-      dataIndex: "HasPickUp",
-      width: 95,
-      align: "center",
-      sorter: (a, b) => Number(a.HasPickUp) - Number(b.HasPickUp),
       render: (value) => (
-        <span
-          className={`badge ${
-            value ? "bg-success" : "bg-secondary"
-          }`}
-        >
-          {value ? "Yes" : "No"}
-        </span>
+        <span className="fw-semibold">{formatAmount(value)}</span>
       ),
     },
     {
       title: "Date Added",
       dataIndex: "DateAdded",
-      width: 145,
-      sorter: (a, b) => {
-        const aDate = formatPackageDate(a.DateAdded);
-        const bDate = formatPackageDate(b.DateAdded);
-
-        return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
-      },
+      width: 150,
+      defaultSortOrder: "descend",
+      sorter: (a, b) =>
+        (getAgingDays(a.DateAdded) ?? -1) - (getAgingDays(b.DateAdded) ?? -1),
       render: (value) => {
         const date = formatPackageDate(value);
+        const aging = getAgingDays(value);
 
         if (!date) return "-";
 
         return (
           <div className="packages-date-cell">
             <div>{date.toLocaleDateString("en-GB")}</div>
-            <small className="text-muted">
-              {date.toLocaleTimeString("en-GB")}
+            <small className={aging >= 7 ? "text-danger fw-semibold" : "text-muted"}>
+              {formatAgingLabel(aging)}
             </small>
           </div>
         );
       },
-    },
-    {
-      title: "Status",
-      dataIndex: "StatusCode",
-      width: 180,
-      sorter: (a, b) =>
-        getDisplayText(a.StatusName).localeCompare(
-          getDisplayText(b.StatusName)
-        ),
-      render: (_, record) => (
-        <span
-          className={`${getStatusBadgeClass(
-            record.StatusCode
-          )} packages-status-badge`}
-          title={record.StatusName || record.StatusCode}
-        >
-          {getDisplayText(record.StatusName || record.StatusCode)}
-        </span>
-      ),
-    },
-    {
-      title: "Rider",
-      dataIndex: "RiderName",
-      width: 130,
-      sorter: (a, b) =>
-        getDisplayText(a.RiderName).localeCompare(
-          getDisplayText(b.RiderName)
-        ),
-      render: (text) => <TruncatedText value={text} />,
-    },
-    {
-      title: "Sales Agent",
-      dataIndex: "SalesAgent",
-      width: 145,
-      sorter: (a, b) =>
-        getDisplayText(a.SalesAgent).localeCompare(
-          getDisplayText(b.SalesAgent)
-        ),
-      render: (text) => <TruncatedText value={text} />,
     },
     {
       title: "Action",
@@ -1185,7 +963,7 @@ const PackagesList = () => {
                 loading={loading}
                 tableLayout="fixed"
                 sticky={{ offsetHeader: 0 }}
-                scroll={{ x: 2200, y: 560 }}
+                scroll={{ x: 900, y: 560 }}
                 emptyTitle="No shipment orders found"
                 emptyDescription="Try a different search, clear your date filters, or create a new package."
                 emptyAction={
@@ -1446,18 +1224,6 @@ const PackagesList = () => {
         .packages-date-cell {
           line-height: 1.35;
           white-space: nowrap;
-        }
-
-        .packages-status-badge {
-          display: inline-block;
-          max-width: 135px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          vertical-align: middle;
-          white-space: nowrap;
-          font-size: 11px;
-          font-weight: 700;
-          padding: 5px 8px;
         }
 
         .packages-table .dropdown-toggle {

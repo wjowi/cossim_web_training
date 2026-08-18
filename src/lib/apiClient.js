@@ -131,7 +131,9 @@ export const apiClient = async (url, options = {}) => {
       headers: response.headers,
     }
   } catch (error) {
-    console.error('API Client Error:', error)
+    // Callers decide how a failed request should be presented. Logging a caught
+    // network failure with console.error makes Next.js show its error overlay.
+    console.warn('API Client request failed:', error?.message || error)
     throw error
   }
 }

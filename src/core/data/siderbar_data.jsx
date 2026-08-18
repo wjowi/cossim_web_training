@@ -46,6 +46,14 @@ export const SidebarData = [
         submenu: false,
         description: "DC Management",
       },
+      {
+        label: "Inventory",
+        icon: <Icon.Clipboard />,
+        link: "/admin/inventory",
+        showSubRoute: false,
+        submenu: false,
+        description: "DC Stock & Products",
+      },
     ],
   },
   {

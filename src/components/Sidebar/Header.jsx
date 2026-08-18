@@ -12,7 +12,9 @@ import NavDropdown from 'react-bootstrap/NavDropdown';
 import { userLogout } from "@/services/authService";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAvailableDashboards as getAvailableDashboardsFromRoles, getDashboardPreference } from '@/utils/roleMapping';
-import { getVendorCategories } from "@/services/vendorService";
+import { getVendorCategories, getVendors } from "@/services/vendorService";
+import { getDistributionCenters } from "@/services/adminService";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import styles from "./Header.module.css";
 
 
@@ -22,8 +24,12 @@ const Header = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [vendors, setVendors] = useState([]);
+  const [distributionCenters, setDistributionCenters] = useState([]);
+  const [loadingGlobalOptions, setLoadingGlobalOptions] = useState(false);
   const location = useLocation();
   const { user, vendorCategoryCode, setVendorCategoryCode } = useAuth();
+  const { filters, setFilter } = useGlobalFilters();
 
   const isUserAdmin = user?.AssignedRoles?.some(role => role.RoleTypeCode === 'R-001');
 
@@ -118,13 +124,43 @@ const Header = () => {
             setCategories(data.Data);
           }
         } catch (error) {
-          console.error("Error fetching categories:", error);
+          console.warn("Category options are temporarily unavailable:", error?.message || error);
         } finally {
           setLoadingCategories(false);
         }
       };
       fetchCategories();
     }
+  }, [isAdminView]);
+
+  useEffect(() => {
+    if (!isAdminView) return;
+    const loadGlobalOptions = async () => {
+      setLoadingGlobalOptions(true);
+      const [vendorResult, dcResult] = await Promise.allSettled([
+          getVendors({ pageNo: 1, pageSize: 1000 }),
+          getDistributionCenters({ pageNo: 1, pageSize: 1000 }),
+      ]);
+      try {
+        if (vendorResult.status === "fulfilled") {
+          const vendorResponse = vendorResult.value;
+          setVendors(Array.isArray(vendorResponse) ? vendorResponse : vendorResponse?.Data || []);
+        } else {
+          console.warn("Vendor options are temporarily unavailable:", vendorResult.reason?.message || vendorResult.reason);
+        }
+        if (dcResult.status === "fulfilled") {
+          const dcResponse = dcResult.value;
+          setDistributionCenters(Array.isArray(dcResponse) ? dcResponse : dcResponse?.Data || []);
+        } else {
+          console.warn("DC options are temporarily unavailable:", dcResult.reason?.message || dcResult.reason);
+        }
+      } catch (error) {
+        console.warn("Unable to prepare global filter options:", error?.message || error);
+      } finally {
+        setLoadingGlobalOptions(false);
+      }
+    };
+    loadGlobalOptions();
   }, [isAdminView]);
 
   const getLogoRoute = () => {
@@ -501,6 +537,32 @@ const Header = () => {
                 }}
               />
             </div>
+          </li>
+        )}
+        {isAdminView && (
+          <li className={`nav-item d-none d-lg-flex ${styles.globalFilters}`}>
+            <label className={styles.dateFilter} title="Start date">
+              <FeatherIcon icon="calendar" />
+              <input type="date" value={filters.startDate} max={filters.endDate} onChange={(event) => setFilter("startDate", event.target.value)} aria-label="Start date" />
+            </label>
+            <span className={styles.dateSeparator}>to</span>
+            <label className={styles.dateFilter} title="End date">
+              <input type="date" value={filters.endDate} min={filters.startDate} onChange={(event) => setFilter("endDate", event.target.value)} aria-label="End date" />
+            </label>
+            <select value={filters.vendorCode} onChange={(event) => setFilter("vendorCode", event.target.value)} disabled={loadingGlobalOptions} aria-label="Vendor">
+              <option value="">All vendors</option>
+              {vendors.map((vendor) => {
+                const code = vendor.VendorCode || vendor.vendorCode;
+                return <option key={code} value={code}>{vendor.VendorName || vendor.vendorName || code}</option>;
+              })}
+            </select>
+            <select value={filters.dcCode} onChange={(event) => setFilter("dcCode", event.target.value)} disabled={loadingGlobalOptions} aria-label="Distribution center">
+              <option value="">All DCs</option>
+              {distributionCenters.map((dc) => {
+                const code = dc.DCCode || dc.dcCode;
+                return <option key={code} value={code}>{dc.DCName || dc.dcName || code}</option>;
+              })}
+            </select>
           </li>
         )}
         {/* Search */}

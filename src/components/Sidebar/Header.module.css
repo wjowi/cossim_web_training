@@ -1,6 +1,41 @@
 /* ─── Desktop dashboard switcher (unchanged) ─── */
 .dashboardSwitcher { padding: 0.5rem 0; }
 
+.globalFilters {
+  align-items: center;
+  gap: 7px;
+  margin-right: 10px;
+}
+.globalFilters select,
+.dateFilter {
+  height: 36px;
+  border: 1px solid #e4e7ec;
+  border-radius: 6px;
+  background: #fff;
+  color: #344054;
+  font-size: 12px;
+}
+.globalFilters select {
+  width: 145px;
+  padding: 0 26px 0 9px;
+}
+.dateFilter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+}
+.dateFilter svg { width: 14px; color: #ff6200; }
+.dateFilter input {
+  width: 112px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+}
+.dateSeparator { color: #98a2b3; font-size: 10px; text-transform: uppercase; }
+
 .dropdownHeader {
   color: #6c757d;
   font-size: 0.875rem;

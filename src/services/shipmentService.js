@@ -76,6 +76,8 @@ export const getShipmentOrdersByVendor = async (params = {}) => {
         if (params.onlyActive !== undefined) queryParams.append('onlyActive', params.onlyActive);
         if (params.startDate) queryParams.append('startDate', params.startDate);
         if (params.endDate) queryParams.append('endDate', params.endDate);
+        if (params.orderBy) queryParams.append('orderBy', params.orderBy);
+        if (params.sortDir) queryParams.append('sortDir', params.sortDir);
 
         const url = `${apiRoutes.shipment.getOrdersByVendor}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
         const response = await api.get(url);
@@ -119,6 +121,8 @@ export const getShipmentOrders = async (params = {}) => {
         if (params.onlyActive !== undefined) queryParams.append('onlyActive', params.onlyActive);
         if (params.startDate) queryParams.append('startDate', params.startDate);
         if (params.endDate) queryParams.append('endDate', params.endDate);
+        if (params.orderBy) queryParams.append('orderBy', params.orderBy);
+        if (params.sortDir) queryParams.append('sortDir', params.sortDir);
 
         const url = `${apiRoutes.shipment.getOrders}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
         const response = await api.get(url);

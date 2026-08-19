@@ -7,8 +7,10 @@ import {
   Printer,
   UploadCloud,
   RefreshCw,
+  Layers,
 } from "feather-icons-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import withReactContent from "sweetalert2-react-content";
 import Swal from "sweetalert2";
 import notify from "@/lib/toast";
@@ -69,6 +71,59 @@ const parsePackageFilterDate = (value) => {
   return new Date(year, month - 1, day);
 };
 
+const getTaskType = (order) => {
+  if (getOrderSlaState(order).level === "red") return "return";
+  const status = String(order?.StatusCode || order?.StatusName || "")
+    .replaceAll("_", " ")
+    .toUpperCase();
+  if (/RETURN|FAILED|DECLINED|CANCELLED/.test(status)) return "return";
+  if (/CONFIRMED BY VENDOR|ORDER CONFIRMED|IN TRANSIT|PICKED|HANDED|ARRIVED/.test(status)) return "receive";
+  return "dispatch";
+};
+
+const getOrderAgeDays = (value) => {
+  if (!value) return 0;
+  const added = new Date(value);
+  if (Number.isNaN(added.getTime())) return 0;
+  const today = new Date();
+  const addedDay = new Date(added.getFullYear(), added.getMonth(), added.getDate());
+  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.max(0, Math.floor((todayDay - addedDay) / 86400000));
+};
+
+const getOrderSlaState = (order) => {
+  const status = String(order?.SLAStatus || order?.slaStatus || "").toUpperCase();
+  const isBreached = order?.IsSLABreached ?? order?.SLABreached ?? order?.isSlaBreached;
+  const percentage = Number(order?.SLAPercentageUsed ?? order?.slaPercentageUsed ?? order?.SLAPercentage);
+  const slaHours = Number(order?.SLAHours ?? order?.slaHours);
+  const added = order?.DateAdded ? new Date(order.DateAdded) : null;
+  const ageHours = added && !Number.isNaN(added.getTime()) ? (Date.now() - added.getTime()) / 3600000 : 0;
+  const deadlineValue = order?.SLADeadline || order?.ExpectedDeliveryDate || order?.DueDate;
+  const deadline = deadlineValue ? new Date(deadlineValue) : null;
+
+  let level = "green";
+  if (isBreached === true || /BREACH|OVERDUE|EXPIRED/.test(status)) level = "red";
+  else if (isBreached === false || /WITHIN|COMPLIANT|ON TRACK/.test(status)) level = "green";
+  else if (Number.isFinite(percentage)) level = percentage >= 100 ? "red" : percentage >= 80 ? "yellow" : "green";
+  else if (Number.isFinite(slaHours) && slaHours > 0) {
+    const used = ageHours / slaHours * 100;
+    level = used >= 100 ? "red" : used >= 80 ? "yellow" : "green";
+  } else if (deadline && !Number.isNaN(deadline.getTime())) {
+    const remainingHours = (deadline.getTime() - Date.now()) / 3600000;
+    level = remainingHours <= 0 ? "red" : remainingHours <= 24 ? "yellow" : "green";
+  } else {
+    const days = getOrderAgeDays(order?.DateAdded);
+    level = days >= 3 ? "red" : days >= 2 ? "yellow" : "green";
+  }
+
+  return {
+    level,
+    priority: level === "red" ? 0 : level === "yellow" ? 1 : 2,
+    label: level === "red" ? "Past SLA" : level === "yellow" ? "Nearing SLA breach" : "Within SLA",
+    color: level === "red" ? "#f04438" : level === "yellow" ? "#f79009" : "#12b76a",
+  };
+};
+
 const getPackageQueryFilters = () => {
   if (typeof window === "undefined") return {};
   const params = new URLSearchParams(window.location.search);
@@ -84,8 +139,9 @@ const getPackageQueryFilters = () => {
   };
 };
 
-const PackagesList = () => {
+const PackagesList = ({ initialStatusName = "" }) => {
   const route = all_routes;
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [vendorCode, setVendorCode] = useState("");
   const [fromDCCode, setFromDCCode] = useState("");
@@ -101,6 +157,7 @@ const PackagesList = () => {
   const searchTimeoutRef = useRef(null);
 
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [activeTask, setActiveTask] = useState("dispatch");
 
   // Sticker download hook
   const { showSizeSelectionModal, showBulkSizeSelectionModal, isGenerating } = useStickerDownload();
@@ -125,6 +182,25 @@ const PackagesList = () => {
     distributionCenters,
     fetchDistributionCenters,
   } = useAdmin();
+
+  const taskCounts = useMemo(() => ({
+    dispatch: (shipmentOrders || []).filter((order) => getTaskType(order) === "dispatch").length,
+    receive: (shipmentOrders || []).filter((order) => getTaskType(order) === "receive").length,
+    return: (shipmentOrders || []).filter((order) => getTaskType(order) === "return").length,
+  }), [shipmentOrders]);
+  const taskOrders = useMemo(
+    () => (shipmentOrders || [])
+      .filter((order) => getTaskType(order) === activeTask)
+      .sort((a, b) => {
+        const slaDifference = getOrderSlaState(a).priority - getOrderSlaState(b).priority;
+        return slaDifference || getOrderAgeDays(b.DateAdded) - getOrderAgeDays(a.DateAdded);
+      }),
+    [shipmentOrders, activeTask]
+  );
+  const selectedOrdersForActions = useMemo(
+    () => (shipmentOrders || []).filter((order) => selectedRowKeys.includes(order.OrderNO)),
+    [shipmentOrders, selectedRowKeys]
+  );
 
   const statusOptions = useMemo(
     () =>
@@ -184,6 +260,8 @@ const PackagesList = () => {
     onlyActive,
     startDate: formatLocalDateOnly(startDate),
     endDate: formatLocalDateOnly(endDate),
+    orderBy: "DateAdded",
+    sortDir: "ASC",
     ...overrides,
   });
 
@@ -196,10 +274,11 @@ const PackagesList = () => {
   // Fetch shipment orders on component mount
   useEffect(() => {
     const queryFilters = getPackageQueryFilters();
-    const querySearchTerm = queryFilters.statusName || queryFilters.searchTerm || "";
+    const selectedInitialStatus = initialStatusName || queryFilters.statusName || "";
+    const querySearchTerm = selectedInitialStatus || queryFilters.searchTerm || "";
 
     setSearchTerm(queryFilters.searchTerm || "");
-    setSelectedStatusName(queryFilters.statusName || "");
+    setSelectedStatusName(selectedInitialStatus);
     setVendorCode(queryFilters.vendorCode || "");
     setFromDCCode(queryFilters.fromDCCode || "");
     setToDCCode(queryFilters.toDCCode || "");
@@ -217,6 +296,8 @@ const PackagesList = () => {
       onlyActive: Boolean(queryFilters.onlyActive),
       startDate: formatLocalDateOnly(queryFilters.startDate),
       endDate: formatLocalDateOnly(queryFilters.endDate),
+      orderBy: "DateAdded",
+      sortDir: "ASC",
     };
     updateParams(initialParams);
     fetchShipmentOrders(initialParams);
@@ -288,7 +369,9 @@ const PackagesList = () => {
       searchTerm: "",
       startDate: "",
       endDate: "",
-      onlyActive: false
+      onlyActive: false,
+      orderBy: "DateAdded",
+      sortDir: "ASC"
     });
   };
 
@@ -393,6 +476,17 @@ const PackagesList = () => {
     if (selectedPackages.length === 0) return;
 
     showBulkSizeSelectionModal(selectedPackages);
+  };
+
+  const handleConsolidate = () => {
+    if (selectedOrdersForActions.length === 0) return;
+    const originCodes = [...new Set(selectedOrdersForActions.map((order) => order.OriginDCCode).filter(Boolean))];
+    if (originCodes.length !== 1) {
+      notify.error("Select orders from the same origin distribution center to consolidate them.");
+      return;
+    }
+    sessionStorage.setItem("cossim-consolidation-orders", JSON.stringify(selectedOrdersForActions));
+    router.push(`${route.batchesNew}?source=tasks`);
   };
 
   const MySwal = withReactContent(Swal);
@@ -925,6 +1019,156 @@ const PackagesList = () => {
     },
   ];
 
+  const tableColumns = [
+    {
+      title: (
+        <div className="d-flex flex-column gap-1">
+          <span>Order NO</span>
+          <span>Date Added</span>
+          <span>Status</span>
+        </div>
+      ),
+      dataIndex: "OrderNO",
+      width: 300,
+      sorter: (a, b) =>
+        getDisplayText(a.OrderNO).localeCompare(getDisplayText(b.OrderNO)),
+      render: (_, record) => {
+        const date = formatPackageDate(record.DateAdded);
+        return (
+          <div className="d-flex flex-column gap-2 py-1">
+            <Link
+              to={`${route.packages}/${record.OrderNO}`}
+              className="fw-semibold text-primary text-truncate"
+              title={getDisplayText(record.OrderNO)}
+            >
+              {getDisplayText(record.OrderNO)}
+            </Link>
+            <div className="small">
+              <span>{date ? date.toLocaleDateString("en-GB") : "-"}</span>
+              {date && <span className="text-muted ms-2">{date.toLocaleTimeString("en-GB")}</span>}
+            </div>
+            <div>
+              <span
+                className={`${getStatusBadgeClass(record.StatusCode)} packages-status-badge`}
+                title={record.StatusName || record.StatusCode}
+              >
+                {getDisplayText(record.StatusName || record.StatusCode)}
+              </span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      title: "SLA",
+      dataIndex: "DateAdded",
+      width: 120,
+      align: "center",
+      sorter: (a, b) => {
+        const slaDifference = getOrderSlaState(a).priority - getOrderSlaState(b).priority;
+        return slaDifference || getOrderAgeDays(b.DateAdded) - getOrderAgeDays(a.DateAdded);
+      },
+      render: (value, record) => {
+        const days = getOrderAgeDays(value);
+        const sla = getOrderSlaState(record);
+        return (
+          <div className="d-flex align-items-center justify-content-center gap-2" title={sla.label}>
+            <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: "50%", backgroundColor: sla.color, flex: "0 0 9px" }} />
+            <span>{days} {days === 1 ? "day" : "days"}</span>
+            <span className="visually-hidden">{sla.label}</span>
+          </div>
+        );
+      },
+    },
+    {
+      title: (
+        <div className="d-flex flex-column gap-1">
+          <span>Sender</span>
+          <span>Receiver</span>
+        </div>
+      ),
+      dataIndex: "VendorName",
+      width: 330,
+      sorter: (a, b) =>
+        getDisplayText(a.VendorName || a.SenderCompanyName).localeCompare(
+          getDisplayText(b.VendorName || b.SenderCompanyName)
+        ),
+      render: (_, record) => (
+        <div className="d-flex flex-column gap-2 py-1">
+          <div className="packages-person-cell">
+            <div className="d-flex align-items-baseline gap-1">
+              <small className="text-muted flex-shrink-0">From:</small>
+              <TruncatedText
+                value={record.VendorName || record.SenderCompanyName}
+                className="fw-medium"
+              />
+            </div>
+            <TruncatedText
+              value={record.VendorPhone || record.SenderContactPhone}
+              className="text-muted small"
+            />
+          </div>
+          <div className="packages-person-cell">
+            <div className="d-flex align-items-baseline gap-1">
+              <small className="text-muted flex-shrink-0">To:</small>
+              <TruncatedText value={record.ReceiverContactName} className="fw-medium" />
+            </div>
+            <TruncatedText value={record.ReceiverContactPhone} className="text-muted small" />
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Route",
+      dataIndex: "OriginDCName",
+      width: 410,
+      sorter: (a, b) =>
+        getDisplayText(a.OriginDCName).localeCompare(getDisplayText(b.OriginDCName)),
+      render: (_, record) => (
+        <div className="d-flex align-items-center gap-3 py-1">
+          <div className="flex-grow-1 overflow-hidden">
+            <TruncatedText value={record.OriginDCName} className="fw-medium" />
+            <TruncatedText value={record.OriginDCCode} className="text-muted small" />
+          </div>
+          <span className="text-primary" aria-hidden="true">→</span>
+          <div className="flex-grow-1 overflow-hidden">
+            <TruncatedText value={record.DestinationDCName} className="fw-medium" />
+            <TruncatedText value={record.DestinationDCCode} className="text-muted small" />
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: (
+        <div className="d-flex flex-column gap-1 text-end">
+          <span>Service Fee</span>
+          <span>COD</span>
+        </div>
+      ),
+      dataIndex: "ServiceFee",
+      width: 220,
+      align: "right",
+      sorter: (a, b) => Number(a.ServiceFee || 0) - Number(b.ServiceFee || 0),
+      render: (_, record) => (
+        <div className="d-flex flex-column gap-2 py-1 text-end">
+          <div>
+            <small className="text-muted me-1">Fee:</small>
+            <span className="fw-semibold">{formatAmount(record.ServiceFee)}</span>
+          </div>
+          <div>
+            <div>
+              <small className="text-muted me-1">COD:</small>
+              <span className="fw-semibold">{formatAmount(record.CODAmount)}</span>
+            </div>
+            <small className="text-muted">
+              {record.CashOnDeliveryRequired ? "Required" : "Not required"}
+            </small>
+          </div>
+        </div>
+      ),
+    },
+  ];
+
   const renderRefreshTooltip = (props) => (
     <Tooltip id="refresh-tooltip" {...props}>
       Refresh
@@ -941,8 +1185,8 @@ const PackagesList = () => {
       <div className="page-header">
         <div className="add-item d-flex">
           <div className="page-title">
-            <h4>Packages</h4>
-            <h6>Manage your packages</h6>
+            <h4>Task Management</h4>
+            <h6>Manage dispatch, receiving, and return orders</h6>
           </div>
         </div>
         <ul className="table-top-head">
@@ -953,7 +1197,7 @@ const PackagesList = () => {
             pdfColumns={pdfColumns}
             excelColumns={exportColumns}
             filename="packages-export"
-            title="Packages List"
+            title="Task Management Orders"
             fetchAllData={fetchAllDataForExport}
             pdfOrientation="landscape"
             onExportSuccess={(format, result) => {
@@ -1012,6 +1256,15 @@ const PackagesList = () => {
             <RefreshCw className="me-2 iconsize" />
             {`Update Status${selectedRowKeys.length > 0 ? ` (${selectedRowKeys.length})` : ''}`}
           </button>
+          {selectedRowKeys.length > 1 && (
+            <button
+              className="btn btn-outline-primary me-2 d-flex align-items-center"
+              onClick={handleConsolidate}
+            >
+              <Layers className="me-2 iconsize" />
+              {`Consolidate (${selectedRowKeys.length})`}
+            </button>
+          )}
           <Link to={route.createPackage} className="btn btn-added">
             <PlusCircle className="me-2 iconsize" />
             Add New Package
@@ -1131,6 +1384,28 @@ const PackagesList = () => {
             </div>
           </div>
 
+          <div className="packages-task-tabs" role="tablist" aria-label="Shipment tasks">
+            {[
+              ["dispatch", "Orders to Dispatch"],
+              ["receive", "Orders to Receive"],
+              ["return", "Orders to Return"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={activeTask === key}
+                className={`packages-task-tab ${activeTask === key ? "packages-task-tab-active" : ""}`}
+                onClick={() => {
+                  setActiveTask(key);
+                  setSelectedRowKeys([]);
+                }}
+              >
+                <span>{label}</span><b>{taskCounts[key]}</b>
+              </button>
+            ))}
+          </div>
+
           {/* Loading State */}
           {loading && (
             <div className="text-center py-4">
@@ -1163,8 +1438,16 @@ const PackagesList = () => {
                   selectedRowKeys,
                   onChange: setSelectedRowKeys,
                 }}
-                columns={columns}
-                dataSource={shipmentOrders}
+                onRow={(record) => ({
+                  onDoubleClick: (event) => {
+                    if (event.target.closest("a, button, input, select, textarea")) return;
+                    router.push(`${route.packages}/${record.OrderNO}`);
+                  },
+                  title: "Double-click to view package details",
+                  style: { cursor: "pointer" },
+                })}
+                columns={tableColumns}
+                dataSource={taskOrders}
                 pagination={{
                   current: pagination.currentPage,
                   total: pagination.totalItems,
@@ -1185,7 +1468,7 @@ const PackagesList = () => {
                 loading={loading}
                 tableLayout="fixed"
                 sticky={{ offsetHeader: 0 }}
-                scroll={{ x: 2200, y: 560 }}
+                scroll={{ x: 1380, y: 560 }}
                 emptyTitle="No shipment orders found"
                 emptyDescription="Try a different search, clear your date filters, or create a new package."
                 emptyAction={
@@ -1464,6 +1747,10 @@ const PackagesList = () => {
           padding: 4px 8px;
           font-size: 12px;
         }
+
+        .packages-table .ant-table-tbody > tr > td.ant-table-column-sort {
+          background: inherit !important;
+        }
 .packages-route-combined-cell {
   display: flex;
   align-items: center;
@@ -1499,6 +1786,77 @@ const PackagesList = () => {
   font-size: 16px;
   font-weight: 700;
 }
+        .packages-task-tabs {
+          display: flex;
+          align-items: flex-end;
+          gap: 5px;
+          margin: 8px 14px -1px;
+          padding-left: 14px;
+          position: relative;
+          z-index: 3;
+          overflow-x: auto;
+        }
+
+        .packages-task-tab {
+          position: relative;
+          min-width: 190px;
+          min-height: 44px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          padding: 10px 24px;
+          border: 1px solid #d0d5dd;
+          border-bottom-color: #ff6200;
+          border-radius: 17px 17px 0 0;
+          background: #eaecf0;
+          color: #667085;
+          font-size: 12px;
+          font-weight: 700;
+          white-space: nowrap;
+          transition: background .18s ease, color .18s ease, min-height .18s ease;
+        }
+
+        .packages-task-tab b {
+          min-width: 24px;
+          padding: 3px 7px;
+          border-radius: 12px;
+          background: #fff;
+          color: #475467;
+          font-size: 10px;
+          line-height: 1.2;
+          text-align: center;
+        }
+
+        .packages-task-tab:hover {
+          background: #f2f4f7;
+          color: #344054;
+        }
+
+        .packages-task-tab-active {
+          min-height: 50px;
+          border-color: #ff6200;
+          border-bottom-color: #ff6200;
+          background: #ff6200;
+          color: #fff;
+          z-index: 2;
+        }
+
+        .packages-task-tab-active:hover {
+          background: #e55800;
+          color: #fff;
+        }
+
+        .packages-task-tab-active b {
+          color: #b54708;
+        }
+
+        .packages-task-tabs + .text-center,
+        .packages-task-tabs + .alert,
+        .packages-task-tabs ~ .packages-table-shell {
+          border-top-color: #ff6200;
+        }
+
         @media (max-width: 1199.98px) {
           .packages-filter-search,
           .packages-filter-select {

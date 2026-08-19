@@ -17,6 +17,23 @@ import { getDistributionCenters } from "@/services/adminService";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import styles from "./Header.module.css";
 
+const globalFilterSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: '36px',
+    height: '36px',
+    fontSize: '12px',
+    borderColor: state.isFocused ? '#ff6200' : '#e4e7ec',
+    boxShadow: state.isFocused ? '0 0 0 1px #ff6200' : 'none',
+    '&:hover': { borderColor: '#ff6200' }
+  }),
+  valueContainer: (base) => ({ ...base, padding: '0 9px' }),
+  indicatorsContainer: (base) => ({ ...base, height: '34px' }),
+  dropdownIndicator: (base) => ({ ...base, padding: '6px' }),
+  clearIndicator: (base) => ({ ...base, padding: '6px' }),
+  menu: (base) => ({ ...base, fontSize: '12px', zIndex: 9999 })
+};
+
 
 const Header = () => {
   const route = all_routes;
@@ -490,6 +507,7 @@ const Header = () => {
           <li className="nav-item nav-item-box d-none d-md-flex align-items-center" style={{ minWidth: '220px' }}>
             <div className="w-100 px-2">
               <SSRSelect
+                instanceId="header-category-filter"
                 placeholder="Select Category"
                 options={[
                   { value: '', label: 'All Categories' },
@@ -508,6 +526,7 @@ const Header = () => {
                   window.location.reload();
                 }}
                 isLoading={loadingCategories}
+                isSearchable
                 menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                 styles={{
                   control: (base) => ({
@@ -549,20 +568,48 @@ const Header = () => {
             <label className={styles.dateFilter} title="End date">
               <input type="date" value={filters.endDate} min={filters.startDate} onChange={(event) => setFilter("endDate", event.target.value)} aria-label="End date" />
             </label>
-            <select value={filters.vendorCode} onChange={(event) => setFilter("vendorCode", event.target.value)} disabled={loadingGlobalOptions} aria-label="Vendor">
-              <option value="">All vendors</option>
-              {vendors.map((vendor) => {
+            <SSRSelect
+              instanceId="header-vendor-filter"
+              className={styles.globalFilterSelect}
+              aria-label="Vendor"
+              options={vendors.map((vendor) => {
                 const code = vendor.VendorCode || vendor.vendorCode;
-                return <option key={code} value={code}>{vendor.VendorName || vendor.vendorName || code}</option>;
+                return { value: code, label: vendor.VendorName || vendor.vendorName || code };
               })}
-            </select>
-            <select value={filters.dcCode} onChange={(event) => setFilter("dcCode", event.target.value)} disabled={loadingGlobalOptions} aria-label="Distribution center">
-              <option value="">All DCs</option>
-              {distributionCenters.map((dc) => {
+              value={filters.vendorCode ? (() => {
+                const vendor = vendors.find((item) => (item.VendorCode || item.vendorCode) === filters.vendorCode);
+                return vendor ? { value: filters.vendorCode, label: vendor.VendorName || vendor.vendorName || filters.vendorCode } : null;
+              })() : null}
+              onChange={(selected) => setFilter("vendorCode", selected?.value || "")}
+              placeholder="All vendors"
+              isDisabled={loadingGlobalOptions}
+              isLoading={loadingGlobalOptions}
+              isClearable
+              isSearchable
+              noOptionsMessage={() => "No vendors found"}
+              styles={globalFilterSelectStyles}
+            />
+            <SSRSelect
+              instanceId="header-dc-filter"
+              className={styles.globalFilterSelect}
+              aria-label="Distribution center"
+              options={distributionCenters.map((dc) => {
                 const code = dc.DCCode || dc.dcCode;
-                return <option key={code} value={code}>{dc.DCName || dc.dcName || code}</option>;
+                return { value: code, label: dc.DCName || dc.dcName || code };
               })}
-            </select>
+              value={filters.dcCode ? (() => {
+                const dc = distributionCenters.find((item) => (item.DCCode || item.dcCode) === filters.dcCode);
+                return dc ? { value: filters.dcCode, label: dc.DCName || dc.dcName || filters.dcCode } : null;
+              })() : null}
+              onChange={(selected) => setFilter("dcCode", selected?.value || "")}
+              placeholder="All DCs"
+              isDisabled={loadingGlobalOptions}
+              isLoading={loadingGlobalOptions}
+              isClearable
+              isSearchable
+              noOptionsMessage={() => "No distribution centers found"}
+              styles={globalFilterSelectStyles}
+            />
           </li>
         )}
         {/* Search */}

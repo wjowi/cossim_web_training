@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, Row, Col, Badge, Button, Alert, Modal, Form, Table } from "react-bootstrap";
-import { ArrowLeft, Package, MapPin, Phone, Mail, Calendar, DollarSign, Truck, Edit3, Trash2, Eye } from "feather-icons-react";
+import { ArrowLeft, Package, MapPin, Phone, Edit3, Trash2, Printer, RefreshCw, Navigation } from "feather-icons-react";
 import withReactContent from "sweetalert2-react-content";
 import Swal from "sweetalert2";
 import Link from "@/components/Link";
 import useShipment from "@/hooks/useShipment";
+import useStickerDownload from "@/hooks/useStickerDownload";
+import { UpdateStatusModal } from "@/components/modals";
 import notify from "@/lib/toast";
 
 const PackageDetailPage = () => {
@@ -16,11 +18,14 @@ const PackageDetailPage = () => {
   const [packageData, setPackageData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
+  const { showSizeSelectionModal, isGenerating } = useStickerDownload();
 
   const {
     loading: fetchLoading,
     error,
     fetchShipmentOrder,
+    handleUpdateShipmentStatus,
     clearError
   } = useShipment();
 
@@ -66,22 +71,54 @@ const PackageDetailPage = () => {
     return statusMap[status] || "secondary";
   };
 
-  const handleDeletePackage = () => {
-    MySwal.fire({
-      title: "Are you sure?",
-      text: "This will permanently delete the package!",
-      icon: "warning",
+  const handleDeletePackage = async () => {
+    const { value: notes } = await MySwal.fire({
+      title: "Delete Package",
+      text: `Are you sure you want to delete package ${packageData.OrderNO}?`,
+      input: "textarea",
+      inputLabel: "Reason for deletion",
+      inputPlaceholder: "Enter reason for deletion...",
       showCancelButton: true,
       confirmButtonColor: "#dc3545",
-      confirmButtonText: "Yes, delete it!",
+      confirmButtonText: "Delete",
       cancelButtonColor: "#6c757d",
       cancelButtonText: "Cancel",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        notify.success("Package has been deleted.");
-        router.push('/admin/packages');
-      }
+      inputValidator: (value) => !value?.trim() ? "Please enter a reason for deletion" : undefined,
     });
+
+    if (!notes) return;
+
+    try {
+      await handleUpdateShipmentStatus({
+        statusID: 902,
+        orderNO: packageData.OrderNO,
+        notes: notes.trim(),
+        dcCode: "",
+        riderCode: "",
+      });
+      notify.success("Package has been deleted successfully.");
+      router.push('/admin/packages');
+    } catch (deleteError) {
+      console.error("Failed to delete package:", deleteError);
+      notify.error("Failed to delete package. Please try again.");
+    }
+  };
+
+  const handleUpdateStatusSubmit = async (payload) => {
+    const response = await handleUpdateShipmentStatus(payload);
+    if (response?.Error) {
+      throw new Error(response.Message || "Failed to update status");
+    }
+    return response;
+  };
+
+  const handleStatusUpdateSuccess = async () => {
+    try {
+      const response = await fetchShipmentOrder({ orderNO: packageData.OrderNO });
+      setPackageData(response.Data || response.data || response);
+    } catch (refreshError) {
+      console.error("Failed to refresh package details:", refreshError);
+    }
   };
 
   if (loading) {
@@ -107,7 +144,7 @@ const PackageDetailPage = () => {
             <p>The package you're looking for doesn't exist or has been removed.</p>
             <Link to="/admin/packages" className="btn btn-primary">
               <ArrowLeft size={16} className="me-2" />
-              Back to Packages
+              Back to Task Management
             </Link>
           </Alert>
         </div>
@@ -123,14 +160,33 @@ const PackageDetailPage = () => {
               <h6>Tracking Code: {packageData.tracking_code}</h6>
             </div>
           </div>
-          <div className="page-btn d-flex gap-2">
+          <div className="page-btn d-flex flex-wrap gap-2">
             <Link to="/admin/packages" className="btn btn-outline-secondary">
               <ArrowLeft size={16} className="me-2" />
-              Back to Packages
+              Back to Task Management
             </Link>
             <Button variant="primary" onClick={() => setShowEditModal(true)}>
               <Edit3 size={16} className="me-2" />
               Edit Package
+            </Button>
+            <Link
+              to={`/admin/packages/${packageData.OrderNO}/track?trackingNumber=${encodeURIComponent(packageData.OrderNO)}`}
+              className="btn btn-outline-primary"
+            >
+              <Navigation size={16} className="me-2" />
+              Track
+            </Link>
+            <Button
+              variant="outline-primary"
+              onClick={() => showSizeSelectionModal(packageData)}
+              disabled={isGenerating}
+            >
+              <Printer size={16} className="me-2" />
+              {isGenerating ? "Preparing..." : "Print Sticker"}
+            </Button>
+            <Button variant="outline-primary" onClick={() => setShowUpdateStatusModal(true)}>
+              <RefreshCw size={16} className="me-2" />
+              Update Status
             </Button>
             <Button variant="danger" onClick={handleDeletePackage}>
               <Trash2 size={16} className="me-2" />
@@ -576,6 +632,13 @@ const PackageDetailPage = () => {
             </Button>
           </Modal.Footer>
         </Modal>
+        <UpdateStatusModal
+          show={showUpdateStatusModal}
+          onClose={() => setShowUpdateStatusModal(false)}
+          onSubmit={handleUpdateStatusSubmit}
+          onSuccess={handleStatusUpdateSuccess}
+          order={packageData}
+        />
       <style jsx>{`
         .timeline {
           position: relative;

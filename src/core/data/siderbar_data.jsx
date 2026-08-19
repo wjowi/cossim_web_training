@@ -23,12 +23,12 @@ export const SidebarData = [
     submenuHdr: "Operations",
     submenuItems: [
       {
-        label: "Packages",
+        label: "Task Management",
         icon: <Icon.Package />,
         link: "/admin/packages",
         showSubRoute: false,
         submenu: false,
-        description: "Package Management",
+        description: "Shipment Task Management",
       },
       {
         label: "Batches",

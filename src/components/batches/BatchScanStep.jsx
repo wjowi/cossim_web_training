@@ -30,7 +30,7 @@ import styles from "./BatchScanStep.module.scss";
  *   onNext(orders)          — called with final order list when user proceeds
  *   onBack()                — called when user returns to step 1
  */
-export default function BatchScanStep({ form, initialOrders = [], onNext, onBack }) {
+export default function BatchScanStep({ form, initialOrders = [], onNext, onBack, singlePage = false, onOrdersChange, allowedOrderNumbers = [] }) {
   const inputRef = useRef(null);
   const autoSubmitTimeoutRef = useRef(null);
   const submitLockRef = useRef(false);
@@ -53,6 +53,11 @@ export default function BatchScanStep({ form, initialOrders = [], onNext, onBack
   const [scanInput, setScanInput] = useState("");
   const [processing, setProcessing] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
+  const allowedOrders = useMemo(() => new Set(allowedOrderNumbers), [allowedOrderNumbers]);
+
+  useEffect(() => {
+    onOrdersChange?.(selectedOrders);
+  }, [selectedOrders, onOrdersChange]);
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -113,6 +118,20 @@ export default function BatchScanStep({ form, initialOrders = [], onNext, onBack
         return;
       }
 
+      if (allowedOrders.size > 0 && !allowedOrders.has(orderNO)) {
+        setScanResults((prev) => [{
+          id: Date.now(),
+          orderNO,
+          recipient: "—",
+          result: "error",
+          message: "This order was not selected for consolidation",
+          time: new Date().toLocaleTimeString(),
+        }, ...prev]);
+        submitLockRef.current = false;
+        setTimeout(() => inputRef.current?.focus(), 50);
+        return;
+      }
+
       setProcessing(true);
       try {
         const response = await fetchShipmentOrder({ orderNO });
@@ -163,7 +182,7 @@ export default function BatchScanStep({ form, initialOrders = [], onNext, onBack
         setTimeout(() => inputRef.current?.focus(), 50);
       }
     },
-    [scanInput, scannedOrderNOs, fetchShipmentOrder]
+    [scanInput, scannedOrderNOs, fetchShipmentOrder, allowedOrders]
   );
 
   const handleRemoveScanned = useCallback((orderNO) => {
@@ -517,7 +536,7 @@ export default function BatchScanStep({ form, initialOrders = [], onNext, onBack
         </section>
       </div>
 
-      <footer className={styles.footer}>
+      {!singlePage && <footer className={styles.footer}>
         <Button
           variant="outline-secondary"
           onClick={onBack}
@@ -549,7 +568,7 @@ export default function BatchScanStep({ form, initialOrders = [], onNext, onBack
           )}
           <ChevronRight size={17} />
         </Button>
-      </footer>
+      </footer>}
     </div>
   );
 }

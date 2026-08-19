@@ -5,6 +5,14 @@
 
 import { getToken } from '@/services/authService'
 import apiRoutes from '@/constants/apis'
+import {
+  createApiCacheKey,
+  getCachedApiResponse,
+  restoreCachedResponse,
+  setCachedApiResponse,
+} from '@/lib/indexedDbApiCache'
+
+const inFlightGetRequests = new Map()
 
 /**
  * Custom fetch wrapper that automatically includes auth headers
@@ -78,9 +86,15 @@ export const apiClient = async (url, options = {}) => {
     ...options.headers,
   }
 
+  const {
+    indexedDBCache = true,
+    backgroundRefresh = true,
+    ...fetchOptions
+  } = options
+
   // Prepare the request configuration
   const config = {
-    ...options,
+    ...fetchOptions,
     headers,
   }
 
@@ -89,7 +103,11 @@ export const apiClient = async (url, options = {}) => {
     delete config.headers['Content-Type'];
   }
 
-  try {
+  const method = String(config.method || 'GET').toUpperCase()
+  const shouldCache = method === 'GET' && indexedDBCache && options.responseType !== 'blob'
+  const cacheKey = shouldCache ? createApiCacheKey(finalUrl, token || '') : null
+
+  const fetchFromNetwork = async () => {
     const response = await fetch(finalUrl, config)
 
     // Handle different response types
@@ -125,12 +143,45 @@ export const apiClient = async (url, options = {}) => {
       throw new Error(`API Error: ${errorMessage}`)
     }
 
-    return {
+    const result = {
       data,
       status: response.status,
       headers: response.headers,
     }
+
+    if (shouldCache) await setCachedApiResponse(cacheKey, result)
+    return result
+  }
+
+  const getNetworkResponse = () => {
+    if (!shouldCache) return fetchFromNetwork()
+    if (inFlightGetRequests.has(cacheKey)) return inFlightGetRequests.get(cacheKey)
+
+    const request = fetchFromNetwork().finally(() => inFlightGetRequests.delete(cacheKey))
+    inFlightGetRequests.set(cacheKey, request)
+    return request
+  }
+
+  try {
+    if (shouldCache) {
+      const cached = await getCachedApiResponse(cacheKey)
+      if (cached) {
+        if (backgroundRefresh && typeof navigator !== 'undefined' && navigator.onLine) {
+          void getNetworkResponse().catch((error) => {
+            console.warn('Background API refresh failed:', error?.message || error)
+          })
+        }
+        return restoreCachedResponse(cached)
+      }
+    }
+
+    return await getNetworkResponse()
   } catch (error) {
+    if (shouldCache) {
+      const cached = await getCachedApiResponse(cacheKey)
+      if (cached) return restoreCachedResponse(cached)
+    }
+
     // Callers decide how a failed request should be presented. Logging a caught
     // network failure with console.error makes Next.js show its error overlay.
     console.warn('API Client request failed:', error?.message || error)

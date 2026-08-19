@@ -17,7 +17,7 @@ const generateManifestNO = (riderUserCode) => {
 
 const BulkUpdateStatusModal = ({ show, onClose, onSubmit, orders = [] }) => {
   const { usersByRole, fetchUsersByRole, distributionCenters, fetchDistributionCenters, loading: ridersLoading } = useAdmin();
-  const { handlePostRiderManifestTx, orderStatuses, fetchShipmentOrderStatus, loading: statusesLoading } = useShipment();
+  const { handlePostRiderManifestTx } = useShipment();
   const [selectedTransition, setSelectedTransition] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [notes, setNotes] = useState("");
@@ -33,13 +33,6 @@ const BulkUpdateStatusModal = ({ show, onClose, onSubmit, orders = [] }) => {
       setSelectedDC(null);
     }
   }, [show]);
-
-  // Load the full status catalog so every status is selectable, regardless of the selected orders' current statuses
-  useEffect(() => {
-    if (show) {
-      fetchShipmentOrderStatus({ orderBy: "SortOrder", sortDir: "ASC", pageNo: 1, pageSize: 200 });
-    }
-  }, [show, fetchShipmentOrderStatus]);
 
   // Fetch riders when status 301 (Assigned to Rider) or 102 (Order Picked By Courier) is selected
   useEffect(() => {
@@ -59,34 +52,29 @@ const BulkUpdateStatusModal = ({ show, onClose, onSubmit, orders = [] }) => {
     }
   }, [selectedTransition, fetchDistributionCenters]);
 
-  // Offer every status in the system catalog (GetShipmentOrderStatus), not just the ones
-  // reachable from the selected orders' current statuses, since those may differ per order
+  // A bulk action is safe only when the target is a valid next transition for
+  // every selected order. This prevents moving an order backwards in its lifecycle.
   const statusOptions = useMemo(() => {
-    // Best-effort lookup of a matching transition (from any selected order) so the
-    // info panel below can still show its action name / flags when available
-    const transitionsByStatusID = new Map();
-    orders.forEach((order) => {
-      (order.StatusTransitionArray || []).forEach((transition) => {
-        if (!transitionsByStatusID.has(transition.toOrderStatusID)) {
-          transitionsByStatusID.set(transition.toOrderStatusID, transition);
-        }
-      });
-    });
+    if (orders.length === 0) return [];
+    const transitionLists = orders.map((order) => order.StatusTransitionArray || []);
+    if (transitionLists.some((transitions) => transitions.length === 0)) return [];
 
-    return (orderStatuses || [])
-      .filter((status) => status.orderStatusID !== undefined)
-      .map((status) => ({
-        value: status.orderStatusID,
-        label: status.statusName,
-        transition: transitionsByStatusID.get(status.orderStatusID) || {
-          actionName: status.statusName,
-          requiresDeliveryFlow: false,
-          requiresPickupFlow: false,
-          requiresCOD: false,
-          requiresPOD: false,
-        },
+    const commonIds = transitionLists.slice(1).reduce(
+      (ids, transitions) => {
+        const available = new Set(transitions.map((transition) => String(transition.toOrderStatusID)));
+        return new Set([...ids].filter((id) => available.has(id)));
+      },
+      new Set(transitionLists[0].map((transition) => String(transition.toOrderStatusID)))
+    );
+
+    return transitionLists[0]
+      .filter((transition) => commonIds.has(String(transition.toOrderStatusID)))
+      .map((transition) => ({
+        value: transition.toOrderStatusID,
+        label: transition.actionName,
+        transition,
       }));
-  }, [orderStatuses, orders]);
+  }, [orders]);
 
   // Orders that require COD payment before they can move to the COD/PAYMENT_INITIATED status (801)
   const codOrders = useMemo(
@@ -202,19 +190,18 @@ const BulkUpdateStatusModal = ({ show, onClose, onSubmit, orders = [] }) => {
                   value={selectedTransition}
                   onChange={handleSelectChange}
                   options={statusOptions}
-                  placeholder={statusesLoading && statusOptions.length === 0 ? "Loading statuses..." : "Choose next status..."}
+                  placeholder={statusOptions.length === 0 ? "No common next status" : "Choose next status..."}
                   isSearchable={true}
                   isClearable={false}
                   isDisabled={statusOptions.length === 0}
-                  isLoading={statusesLoading && statusOptions.length === 0}
                   className="react-select-container"
                   classNamePrefix="react-select"
                   instanceId="bulk-status-select"
                   required
                 />
-                {!statusesLoading && statusOptions.length === 0 && (
+                {statusOptions.length === 0 && (
                   <small className="text-danger">
-                    No statuses are available.
+                    The selected orders do not share a valid next status. Select orders at the same lifecycle stage and try again.
                   </small>
                 )}
               </div>

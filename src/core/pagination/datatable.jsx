@@ -140,6 +140,7 @@ const Datatable = ({
   rowKey,
   pagination,
   rowSelection: customRowSelection,
+  onRow,
   scroll,
   sticky,
   tableLayout,
@@ -204,6 +205,7 @@ const Datatable = ({
         key={props}
         className={`table datanew dataTable no-footer datatable-modern ${className}`.trim()}
         rowSelection={rowSelection}
+        onRow={onRow}
         columns={enhancedColumns}
         dataSource={dataSource}
         rowKey={rowKey || ((record) => record.id)}

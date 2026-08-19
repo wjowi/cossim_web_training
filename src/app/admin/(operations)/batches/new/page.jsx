@@ -1,102 +1,82 @@
 "use client";
-import {
-  ArrowLeft,
-  CheckCircle,
-  ChevronLeft,
-  ChevronRight,
-} from "feather-icons-react";
-import React, { useState, useEffect, useMemo } from "react";
+
+import { ArrowLeft, CheckCircle, Layers } from "feather-icons-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import withReactContent from "sweetalert2-react-content";
 import Swal from "sweetalert2";
 import { Badge, Button, Card } from "react-bootstrap";
 import Select from "react-select";
+import { useRouter, useSearchParams } from "next/navigation";
 import notify from "@/lib/toast";
 import Link from "@/components/Link";
 import { all_routes } from "@/Router/all_routes";
 import { postShipmentHandoverBatch } from "@/services/shipmentService";
 import { useAdmin } from "@/hooks/useAdmin";
-import { useRouter } from "next/navigation";
 import BatchScanStep from "@/components/batches/BatchScanStep";
 
-const STEPS = [
-  { num: 1, label: "Configure Batch" },
-  { num: 2, label: "Scan Orders" },
-  { num: 3, label: "Review & Confirm" },
-];
+const readConsolidationOrders = () => {
+  if (typeof window === "undefined") return [];
+  try {
+    const value = JSON.parse(sessionStorage.getItem("cossim-consolidation-orders") || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+};
 
-const CreateHandoverBatch = () => {
+export default function CreateHandoverBatch() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromTasks = searchParams.get("source") === "tasks";
   const MySwal = withReactContent(Swal);
-
-  const [step, setStep] = useState(1);
-  const [form, setForm] = useState({
-    fromDCCode: null,
-    toDCCode: null,
-    courierCode: null,
-    notes: "",
-  });
-  const [selectedOrders, setSelectedOrders] = useState([]);
+  const [sourceOrders] = useState(readConsolidationOrders);
+  const [confirmedOrders, setConfirmedOrders] = useState([]);
+  const [form, setForm] = useState({ fromDCCode: null, toDCCode: null, courierCode: null, notes: "" });
   const [submitting, setSubmitting] = useState(false);
-
-  const {
-    distributionCenters,
-    fetchDistributionCenters,
-    couriers,
-    fetchCouriers,
-  } = useAdmin();
+  const { distributionCenters, fetchDistributionCenters, couriers, fetchCouriers } = useAdmin();
 
   useEffect(() => {
     fetchDistributionCenters();
     fetchCouriers();
   }, [fetchDistributionCenters, fetchCouriers]);
 
-  const handleStep1Next = () => {
-    if (!form.fromDCCode || !form.toDCCode || !form.courierCode) {
-      notify.error("Please fill in all required fields");
-      return;
-    }
-    setStep(2);
-  };
+  const dcOptions = useMemo(() => distributionCenters.map((dc) => ({
+    value: dc.DCCode,
+    label: `${dc.DCCode} - ${dc.DCName}${dc.CityName ? ` (${dc.CityName})` : ""}`,
+  })), [distributionCenters]);
+  const courierOptions = useMemo(() => (Array.isArray(couriers) ? couriers : [])
+    .filter((courier) => courier.IsActive && !courier.IsDeleted)
+    .map((courier) => ({ value: courier.CourierCode, label: `${courier.CourierName} - ${courier.CourierCode}` })), [couriers]);
+
+  useEffect(() => {
+    if (form.fromDCCode || sourceOrders.length === 0 || dcOptions.length === 0) return;
+    const origin = dcOptions.find((option) => option.value === sourceOrders[0]?.OriginDCCode);
+    if (origin) setForm((previous) => ({ ...previous, fromDCCode: origin }));
+  }, [dcOptions, form.fromDCCode, sourceOrders]);
+
+  const allowedOrderNumbers = useMemo(() => sourceOrders.map((order) => order.OrderNO).filter(Boolean), [sourceOrders]);
+  const handleOrdersChange = useCallback((orders) => setConfirmedOrders(orders), []);
+  const configurationComplete = form.fromDCCode && form.toDCCode && form.courierCode;
 
   const handleSubmit = async () => {
-    if (selectedOrders.length === 0 || !form.fromDCCode || !form.toDCCode || !form.courierCode) {
-      notify.error("Please fill in all required fields");
-      return;
-    }
+    if (!configurationComplete) return notify.error("Select the origin, destination, and courier.");
+    if (confirmedOrders.length === 0) return notify.error("Scan at least one selected order to confirm it.");
+    if (fromTasks && confirmedOrders.length !== sourceOrders.length) return notify.error(`Confirm all ${sourceOrders.length} selected orders before finishing.`);
 
     setSubmitting(true);
     try {
-      const batchData = {
+      const response = await postShipmentHandoverBatch({
         fromDCCode: form.fromDCCode.value,
         toDCCode: form.toDCCode.value,
         courierCode: form.courierCode.value,
-        riderUserCode: "", // Assuming no rider for handover batch
+        riderUserCode: "",
         notes: form.notes,
-        shipmentOrderArray: selectedOrders.map((o) => ({ orderNO: o.OrderNO })),
-      };
-
-      const response = await postShipmentHandoverBatch(batchData);
-
-      if (response.Error) {
-        notify.error(response.Message || "Failed to create handover batch");
-      } else {
-        MySwal.fire({
-          title: "Success!",
-          text: "Handover batch created successfully!",
-          icon: "success",
-          confirmButtonText: "View Batches",
-          showCancelButton: true,
-          cancelButtonText: "Create Another",
-        }).then((result) => {
-          if (result.isConfirmed) {
-            router.push(all_routes.batches);
-          } else {
-            setStep(1);
-            setForm({ fromDCCode: null, toDCCode: null, courierCode: null, notes: "" });
-            setSelectedOrders([]);
-          }
-        });
-      }
+        shipmentOrderArray: confirmedOrders.map((order) => ({ orderNO: order.OrderNO })),
+      });
+      if (response?.Error) throw new Error(response.Message || "Failed to create handover batch");
+      sessionStorage.removeItem("cossim-consolidation-orders");
+      await MySwal.fire({ title: "Batch created", text: `${confirmedOrders.length} orders were consolidated successfully.`, icon: "success", confirmButtonText: "View Batches" });
+      router.push(all_routes.batches);
     } catch (error) {
       notify.error(error.message || "Failed to create handover batch");
     } finally {
@@ -104,294 +84,58 @@ const CreateHandoverBatch = () => {
     }
   };
 
-  // --- Step 1 helpers ---
-
-  const dcOptions = distributionCenters
-    .filter((dc) => dc.IsPrimary)
-    .map((dc) => ({
-      value: dc.DCCode,
-      label: `${dc.DCCode} - ${dc.DCName} (${dc.CityName})`,
-    }));
-
-  const toDcOptions = distributionCenters.map((dc) => ({
-    value: dc.DCCode,
-    label: `${dc.DCCode} - ${dc.DCName} (${dc.CityName})`,
-  }));
-
-  const handleSelectChange = (selectedOption, actionMeta) => {
-    setForm((prev) => ({ ...prev, [actionMeta.name]: selectedOption }));
-  };
-
-  const courierOptions = useMemo(() => {
-    if (!Array.isArray(couriers)) return [];
-    return couriers
-      .filter((c) => c.IsActive && !c.IsDeleted)
-      .map((c) => ({
-        value: c.CourierCode,
-        label: `${c.CourierName} - ${c.CourierCode}`,
-      }));
-  }, [couriers]);
-
-  const selectStyles = {
-    control: (base) => ({ ...base, backgroundColor: "#F5E6D8" }),
-  };
-
   return (
     <div className="content">
       <div className="page-header">
-        <div className="add-item d-flex">
-          <div className="page-title">
-            <Link href={all_routes.batches} className="btn btn-outline-primary me-3">
-              <ArrowLeft size={16} className="me-2" />
-              Back to Batches
-            </Link>
-            <div>
-              <h4>Create Handover Batch</h4>
-              <h6>Configure batch details, scan orders, and review before creating</h6>
+        <div className="add-item d-flex align-items-center gap-3">
+          <Link to={fromTasks ? all_routes.packages : all_routes.batches} className="btn btn-outline-primary">
+            <ArrowLeft size={16} className="me-2" />
+            {fromTasks ? "Back to Task Management" : "Back to Batches"}
+          </Link>
+          <div className="page-title"><h4>Consolidate Orders</h4><h6>Configure, scan to confirm, and finish on one page</h6></div>
+        </div>
+      </div>
+
+      <Card className="mb-3">
+        <Card.Header className="d-flex justify-content-between align-items-center">
+          <h5 className="mb-0"><Layers size={18} className="me-2" />Batch Configuration</h5>
+          {fromTasks && <Badge bg="primary">{sourceOrders.length} selected</Badge>}
+        </Card.Header>
+        <Card.Body>
+          <div className="row">
+            <div className="col-lg-4 mb-3">
+              <label className="form-label fw-bold">From Distribution Center *</label>
+              <Select value={form.fromDCCode} options={dcOptions} onChange={(value) => setForm((old) => ({ ...old, fromDCCode: value }))} isDisabled={fromTasks && Boolean(form.fromDCCode)} isSearchable placeholder="Select source DC" />
+            </div>
+            <div className="col-lg-4 mb-3">
+              <label className="form-label fw-bold">Destination *</label>
+              <Select value={form.toDCCode} options={dcOptions.filter((option) => option.value !== form.fromDCCode?.value)} onChange={(value) => setForm((old) => ({ ...old, toDCCode: value }))} isSearchable placeholder="Select destination DC" />
+            </div>
+            <div className="col-lg-4 mb-3">
+              <label className="form-label fw-bold">Courier *</label>
+              <Select value={form.courierCode} options={courierOptions} onChange={(value) => setForm((old) => ({ ...old, courierCode: value }))} isSearchable placeholder="Select courier" />
+            </div>
+            <div className="col-12">
+              <label className="form-label fw-bold">Notes</label>
+              <textarea className="form-control" rows="2" value={form.notes} onChange={(event) => setForm((old) => ({ ...old, notes: event.target.value }))} placeholder="Optional handover notes" />
             </div>
           </div>
-        </div>
-      </div>
+          {fromTasks && sourceOrders.length > 0 && <div className="mt-3"><small className="text-muted d-block mb-2">Orders awaiting scan confirmation</small>{sourceOrders.map((order) => <Badge key={order.OrderNO} bg="light" text="dark" className="me-1 mb-1">{order.OrderNO}</Badge>)}</div>}
+        </Card.Body>
+      </Card>
 
-      <div className="row">
-        <div className="col-12">
-          <Card>
-            <Card.Body>
-              {/* ── Progress Stepper ── */}
-              <div className="d-flex align-items-center justify-content-center mb-5">
-                {STEPS.map((s, idx) => (
-                  <React.Fragment key={s.num}>
-                    <div className="d-flex align-items-center gap-2">
-                      <div
-                        className={`rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 fw-bold ${
-                          step >= s.num ? "bg-primary text-white" : "bg-light text-muted"
-                        }`}
-                        style={{ width: 36, height: 36, fontSize: 14 }}
-                      >
-                        {step > s.num ? <CheckCircle size={16} /> : s.num}
-                      </div>
-                      <span
-                        className={`fw-semibold ${step >= s.num ? "text-primary" : "text-muted"}`}
-                        style={{ whiteSpace: "nowrap", fontSize: 14 }}
-                      >
-                        {s.label}
-                      </span>
-                    </div>
-                    {idx < STEPS.length - 1 && (
-                      <div
-                        className={`mx-3 flex-shrink-0 ${step > s.num ? "bg-primary" : "bg-light"}`}
-                        style={{ height: 2, width: 64 }}
-                      />
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-
-              {/* ══ Step 1: Configure Batch ══ */}
-              {step === 1 && (
-                <div>
-                  <h5 className="mb-4">Configure Batch Details</h5>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-4">
-                      <label className="form-label fw-bold">From Distribution Center *</label>
-                      <Select
-                        name="fromDCCode"
-                        value={form.fromDCCode}
-                        onChange={handleSelectChange}
-                        options={dcOptions}
-                        placeholder="Select Source DC"
-                        isClearable
-                        isSearchable
-                        className="react-select-container"
-                        classNamePrefix="react-select"
-                        styles={selectStyles}
-                      />
-                    </div>
-
-                    <div className="col-md-6 mb-4">
-                      <label className="form-label fw-bold">To Distribution Center *</label>
-                      <Select
-                        name="toDCCode"
-                        value={form.toDCCode}
-                        onChange={handleSelectChange}
-                        options={toDcOptions}
-                        placeholder="Select Destination DC"
-                        isClearable
-                        isSearchable
-                        className="react-select-container"
-                        classNamePrefix="react-select"
-                        styles={selectStyles}
-                      />
-                    </div>
-
-                    <div className="col-md-6 mb-4">
-                      <label className="form-label fw-bold">Courier *</label>
-                      <Select
-                        name="courierCode"
-                        value={form.courierCode}
-                        onChange={handleSelectChange}
-                        options={courierOptions}
-                        placeholder="Select Courier"
-                        isClearable
-                        isSearchable
-                        className="react-select-container"
-                        classNamePrefix="react-select"
-                        styles={selectStyles}
-                      />
-                    </div>
-
-                    <div className="col-12 mb-4">
-                      <label className="form-label fw-bold">Notes</label>
-                      <textarea
-                        className="form-control"
-                        rows="4"
-                        value={form.notes}
-                        onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-                        placeholder="Optional notes for the handover batch"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="d-flex justify-content-end">
-                    <Button
-                      variant="primary"
-                      size="lg"
-                      onClick={handleStep1Next}
-                      disabled={!form.fromDCCode || !form.toDCCode || !form.courierCode}
-                      className="d-flex align-items-center gap-2"
-                    >
-                      Next: Scan Orders
-                      <ChevronRight size={18} />
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* ══ Step 2: Scan Orders — delegated to shared component ══ */}
-              {step === 2 && (
-                <BatchScanStep
-                  form={form}
-                  initialOrders={selectedOrders}
-                  onNext={(orders) => {
-                    setSelectedOrders(orders);
-                    setStep(3);
-                  }}
-                  onBack={() => setStep(1)}
-                />
-              )}
-
-              {/* ══ Step 3: Review & Confirm ══ */}
-              {step === 3 && (
-                <div>
-                  <h5 className="mb-4">Review Batch Details</h5>
-
-                  <div className="row">
-                    <div className="col-md-6 mb-4">
-                      <div className="border rounded p-3">
-                        <h6 className="mb-3">Batch Configuration</h6>
-                        <div className="mb-2">
-                          <strong>From DC:</strong> {form.fromDCCode?.label || "Not selected"}
-                        </div>
-                        <div className="mb-2">
-                          <strong>To DC:</strong> {form.toDCCode?.label || "Not selected"}
-                        </div>
-                        <div className="mb-2">
-                          <strong>Courier:</strong> {form.courierCode?.label || "Not selected"}
-                        </div>
-                        {form.notes && (
-                          <div className="mb-2">
-                            <strong>Notes:</strong> {form.notes}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="col-md-6 mb-4">
-                      <div className="border rounded p-3">
-                        <h6 className="mb-3">Order Summary</h6>
-                        <div className="mb-2">
-                          <strong>Total Orders:</strong> {selectedOrders.length}
-                        </div>
-                        <div className="mb-2">
-                          <strong>Order Numbers:</strong>
-                          <div className="mt-2" style={{ maxHeight: 100, overflowY: "auto" }}>
-                            {selectedOrders.map((order) => (
-                              <Badge key={order.OrderNO} bg="secondary" className="me-1 mb-1">
-                                {order.OrderNO}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <h6 className="mb-3">Selected Orders Details:</h6>
-                    <div className="border rounded p-3" style={{ maxHeight: 300, overflowY: "auto" }}>
-                      {selectedOrders.map((order) => (
-                        <div
-                          key={order.OrderNO}
-                          className="d-flex justify-content-between align-items-center mb-3 p-2 rounded"
-                        >
-                          <div>
-                            <strong>{order.OrderNO}</strong>
-                            <br />
-                            <small className="text-muted">
-                              Vendor: {order.VendorName || "N/A"} | Type:{" "}
-                              {order.DeliveryTypeName || "N/A"} | Created:{" "}
-                              {order.CreatedDate
-                                ? new Date(order.CreatedDate).toLocaleDateString()
-                                : "N/A"}
-                            </small>
-                          </div>
-                          <Badge bg={order.StatusID === 1 ? "success" : "warning"}>
-                            {order.StatusName || "Unknown"}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="d-flex justify-content-between">
-                    <Button
-                      variant="outline-secondary"
-                      size="lg"
-                      onClick={() => setStep(2)}
-                      className="d-flex align-items-center gap-2"
-                    >
-                      <ChevronLeft size={18} />
-                      Back to Scan Orders
-                    </Button>
-                    <Button
-                      variant="success"
-                      size="lg"
-                      onClick={handleSubmit}
-                      disabled={submitting}
-                      className="d-flex align-items-center gap-2"
-                    >
-                      {submitting ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm" role="progressbar" />
-                          Creating Batch…
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle size={18} />
-                          Create Handover Batch
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card.Body>
-          </Card>
-        </div>
-      </div>
+      {configurationComplete ? (
+        <Card><Card.Body>
+          <BatchScanStep form={form} initialOrders={[]} allowedOrderNumbers={fromTasks ? allowedOrderNumbers : []} singlePage onOrdersChange={handleOrdersChange} />
+          <div className="d-flex justify-content-between align-items-center border-top pt-3 mt-3">
+            <span className="text-muted">{confirmedOrders.length} of {fromTasks ? sourceOrders.length : confirmedOrders.length} orders confirmed</span>
+            <Button variant="success" size="lg" onClick={handleSubmit} disabled={submitting || confirmedOrders.length === 0 || (fromTasks && confirmedOrders.length !== sourceOrders.length)}>
+              {submitting ? <span className="spinner-border spinner-border-sm me-2" /> : <CheckCircle size={18} className="me-2" />}
+              Finish Consolidation
+            </Button>
+          </div>
+        </Card.Body></Card>
+      ) : <div className="alert alert-info">Select the destination and courier to begin scanning.</div>}
     </div>
   );
-};
-
-export default CreateHandoverBatch;
+}

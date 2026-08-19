@@ -19,6 +19,9 @@
   width: 145px;
   padding: 0 26px 0 9px;
 }
+.globalFilterSelect {
+  width: 145px;
+}
 .dateFilter {
   display: flex;
   align-items: center;

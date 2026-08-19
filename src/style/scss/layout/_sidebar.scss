@@ -106,10 +106,10 @@
             color: $gray-500;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin: 20px 0 16px 0;
+            margin: 30px 0 16px 0;
             padding: 0 15px;
             position: relative;
-            
+
             &:first-child {
                 margin-top: 10px;
             }
@@ -124,8 +124,49 @@
                 background: linear-gradient(90deg, $primary 0%, $primary-400 100%);
                 border-radius: 1px;
             }
+
+            &.submenu-hdr-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                cursor: pointer;
+                padding-right: 30px;
+                user-select: none;
+                @include transition(color 0.2s ease);
+
+                &:hover {
+                    color: $primary;
+                }
+
+                .submenu-hdr-arrow {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: absolute;
+                    right: 12px;
+                    top: 50%;
+                    transform: translateY(-50%) rotate(0deg);
+                    width: 16px;
+                    height: 16px;
+                    @include transition(transform 0.25s ease);
+
+                    &:before {
+                        content: "";
+                        width: 6px;
+                        height: 6px;
+                        border-right: 1.5px solid currentColor;
+                        border-bottom: 1.5px solid currentColor;
+                        transform: rotate(45deg);
+                    }
+                }
+
+                &.open .submenu-hdr-arrow {
+                    transform: translateY(-50%) rotate(-90deg);
+                    color: $primary;
+                }
+            }
         }
-        
+
         > ul{
             > li{
                 margin-bottom: 8px;
@@ -441,6 +482,8 @@
 
         }
         .submenu-open {
+            margin-bottom: 10px;
+
             &:last-child {
                 margin-bottom: 0;
                 ul {

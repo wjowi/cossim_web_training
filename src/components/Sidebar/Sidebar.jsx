@@ -7,6 +7,8 @@ import SidebarItem from "./SidebarItem";
 
 const Sidebar = () => {
   const Location = useLocation();
+  const [openGroup, setOpenGroup] = useState("");
+  const [hoveredGroup, setHoveredGroup] = useState("");
   const [subOpen, setSubopen] = useState("");
   const [subsidebar, setSubsidebar] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -16,6 +18,10 @@ const Sidebar = () => {
       document.querySelector(".main-wrapper")?.classList.remove("slide-nav");
       document.querySelector(".sidebar-overlay")?.classList.remove("opened");
     }
+  };
+
+  const toggleGroup = (label) => {
+    setOpenGroup((prev) => (prev === label ? "" : label));
   };
 
   const toggleSidebar = (title) => {
@@ -34,9 +40,23 @@ const Sidebar = () => {
     }
   };
 
-  // Auto-expand active submenu on page load
+  // Auto-expand active group + submenu on page load
   useEffect(() => {
     SidebarData.forEach((mainLabel) => {
+      const groupLinks = [];
+      mainLabel?.submenuItems?.forEach((title) => {
+        if (title?.link) groupLinks.push(title.link);
+        title?.submenuItems?.forEach((item) => {
+          if (item?.link) groupLinks.push(item.link);
+          item?.submenuItems?.forEach((sub) => {
+            if (sub?.link) groupLinks.push(sub.link);
+          });
+        });
+      });
+      if (groupLinks.includes(Location.pathname)) {
+        setOpenGroup(mainLabel?.label);
+      }
+
       mainLabel?.submenuItems?.forEach((title) => {
         if (title?.links?.includes(Location.pathname)) {
           setSubopen(title?.label);
@@ -57,11 +77,41 @@ const Sidebar = () => {
           <div className="sidebar-inner slimscroll">
             <div id="sidebar-menu" className="sidebar-menu">
               <ul>
-                {SidebarData?.map((mainLabel) => (
-                  <li className="submenu-open" key={mainLabel?.label}>
-                    <h6 className="submenu-hdr">{mainLabel?.label}</h6>
+                {SidebarData?.map((mainLabel) => {
+                  const isCollapsible = mainLabel?.collapsible !== false;
+                  const isOpen =
+                    !isCollapsible ||
+                    openGroup === mainLabel?.label ||
+                    hoveredGroup === mainLabel?.label;
 
-                    <ul>
+                  return (
+                  <li
+                    className="submenu-open"
+                    key={mainLabel?.label}
+                    onMouseEnter={() => isCollapsible && setHoveredGroup(mainLabel?.label)}
+                    onMouseLeave={() => isCollapsible && setHoveredGroup("")}
+                  >
+                    {isCollapsible ? (
+                      <h6
+                        className={`submenu-hdr submenu-hdr-toggle ${isOpen ? "open" : ""}`}
+                        onClick={() => toggleGroup(mainLabel?.label)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleGroup(mainLabel?.label);
+                          }
+                        }}
+                      >
+                        {mainLabel?.label}
+                        <span className="submenu-hdr-arrow" aria-hidden="true" />
+                      </h6>
+                    ) : (
+                      <h6 className="submenu-hdr">{mainLabel?.label}</h6>
+                    )}
+
+                    <ul style={{ display: isOpen ? "block" : "none" }}>
                       {mainLabel?.submenuItems?.map((title, i) => {
                         // Build array of all possible links for this menu item
                         let link_array = [title?.link]; // Include the parent link
@@ -143,7 +193,8 @@ const Sidebar = () => {
                       })}
                     </ul>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </div>
           </div>

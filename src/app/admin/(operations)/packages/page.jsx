@@ -1692,6 +1692,7 @@ const PackagesList = ({ initialStatusName = "", initialTask = "dispatch" }) => {
             border-radius: 6px;
           }
         }
+
       `}</style>
     </div>
   );

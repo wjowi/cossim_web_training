@@ -1,0 +1,19 @@
+﻿
+> cossim-next-frontend@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.21
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.153:3000
+   - Experiments (use with caution):
+     · webVitalsAttribution
+
+ ✓ Starting...
+ ✓ Ready in 3.2s
+ ○ Compiling / ...
+ ✓ Compiled / in 1653ms (886 modules)
+ GET / 200 in 2409ms
+ ○ Compiling /admin/distribution-centers/[id]/users ...
+ ✓ Compiled /admin/distribution-centers/[id]/users in 9.2s (5391 modules)
+ GET /admin/distribution-centers/TEST123/users 200 in 12358ms
+[?25h

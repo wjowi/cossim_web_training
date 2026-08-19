@@ -5,27 +5,22 @@ import {
   PlusCircle,
 } from "feather-icons-react";
 import React, { useState, useEffect } from "react";
-import withReactContent from "sweetalert2-react-content";
-import Swal from "sweetalert2";
+import { useRouter } from "next/navigation";
 import notify from "@/lib/toast";
 import { OverlayTrigger, Tooltip, Badge } from "react-bootstrap";
 import Link from "@/components/Link";
 import { all_routes } from "@/Router/all_routes";
 import Datatable from "@/core/pagination/datatable";
-import RowActionsDropdown from "@/components/RowActionsDropdown";
 import ImageWithBasePath from "@/core/img/imagewithbasebath";
 import {
   getDistributionCenters,
   createDistributionCenter,
-  updateDistributionCenter,
-  deactivateDistributionCenter,
 } from "@/services/adminService";
 import { AddDistributionCenterModal } from "@/components/modals";
 
 const DistributionCentersList = () => {
+  const router = useRouter();
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedCenter, setSelectedCenter] = useState(null);
   const [distributionCenters, setDistributionCenters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -114,70 +109,6 @@ const DistributionCentersList = () => {
     }
   };
 
-  const handleEditCenter = async (data, dcCode) => {
-    try {
-      setIsCreating(true);
-      const updateData = { ...data, DCCode: dcCode }; // Include DCCode in the data
-      const response = await updateDistributionCenter(updateData);
-      if (response && !response.Error) {
-        setShowEditModal(false);
-        setSelectedCenter(null);
-        notify.success("Distribution center updated successfully.");
-        fetchDistributionCenters();
-      } else {
-        throw new Error(
-          response?.Message || "Failed to update distribution center"
-        );
-      }
-    } catch (err) {
-      console.error("Error updating distribution center:", err);
-      notify.error(err.message);
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  const handleEditClick = (record) => {
-    setSelectedCenter(record);
-    setShowEditModal(true);
-  };
-
-  const MySwal = withReactContent(Swal);
- const showConfirmationAlert = async (dcCode) => {
-  const result = await MySwal.fire({
-    title: "Deactivate Distribution Center?",
-    text: `Are you sure you want to deactivate ${dcCode}?`,
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonColor: "#3085d6",
-    cancelButtonColor: "#d33",
-    confirmButtonText: "Yes, deactivate",
-    cancelButtonText: "Cancel",
-  });
-
-  if (!result.isConfirmed) return;
-
-  try {
-    const response = await deactivateDistributionCenter({
-      DCCode: dcCode,
-    });
-
-    if (response && !response.Error) {
-      notify.success(response.Message || "Distribution center deactivated successfully.");
-
-      fetchDistributionCenters();
-    } else {
-      throw new Error(
-        response?.Message || "Failed to deactivate distribution center."
-      );
-    }
-  } catch (err) {
-    console.error(err);
-
-    notify.error(err.message);
-  }
-};
-
   const columns = [
     {
       title: "DC Code",
@@ -251,41 +182,6 @@ const DistributionCentersList = () => {
       render: (date) => new Date(date).toLocaleDateString(),
       sorter: (a, b) => new Date(a.DateAdded) - new Date(b.DateAdded),
     },
-    {
-      title: "Action",
-      dataIndex: "action",
-      render: (_, record) => (
-        <RowActionsDropdown
-          id={`dropdown-basic-${record.DCCode}`}
-          items={[
-            {
-              key: 'view',
-              label: 'View',
-              icon: 'feather-eye',
-              href: `/admin/distribution-centers/${record.DCCode}`,
-            },
-            {
-              key: 'edit',
-              label: 'Edit',
-              icon: 'feather-edit',
-              onClick: () => handleEditClick(record),
-            },
-            {
-              key: 'delete',
-              label: 'Delete',
-              icon: 'feather-trash-2',
-              onClick: () => showConfirmationAlert(record.DCCode),
-            },
-            {
-              key: 'dc-users',
-              label: 'DC Users',
-              icon: 'feather-user',
-              href: `/admin/distribution-centers/${record.DCCode}/users`,
-            },
-          ]}
-        />
-      ),
-    },
   ];
 
   const renderTooltip = (props) => (
@@ -316,17 +212,6 @@ const DistributionCentersList = () => {
         onClose={() => setShowAddModal(false)}
         onSubmit={handleAddCenter}
         isLoading={isCreating}
-      />
-      <AddDistributionCenterModal
-        show={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setSelectedCenter(null);
-        }}
-        onSubmit={handleEditCenter}
-        isLoading={isCreating}
-        isEdit={true}
-        initialData={selectedCenter}
       />
         <div className="content">
           <div className="page-header">
@@ -431,6 +316,14 @@ const DistributionCentersList = () => {
                   <Datatable
                     columns={columns}
                     dataSource={distributionCenters}
+                    onRow={(record) => ({
+                      onDoubleClick: (event) => {
+                        if (event.target.closest("a, button, input, select, textarea")) return;
+                        router.push(`/admin/distribution-centers/${record.DCCode}`);
+                      },
+                      title: "Double-click to view center details",
+                      style: { cursor: "pointer" },
+                    })}
                     pagination={{
                       current: pagination.pageNo,
                       pageSize: pagination.pageSize,

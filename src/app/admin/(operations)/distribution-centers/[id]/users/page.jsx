@@ -227,14 +227,15 @@ const DCUsersPage = () => {
           <div className="page-header">
             <div className="add-item d-flex">
               <div className="page-title">
-                <h4>
-                  <Link href={`/distribution-centers/${dcCode}`} className="me-2">
-                    <ArrowLeft size={20} />
-                  </Link>
-                  DC Users - {dcCode}
-                </h4>
+                <h4>DC Users - {dcCode}</h4>
                 <h6>Manage users assigned to this distribution center</h6>
               </div>
+            </div>
+            <div className="page-btn me-2">
+              <Link to={`/admin/distribution-centers/${dcCode}`} className="btn btn-outline-secondary">
+                <ArrowLeft size={16} className="me-2" />
+                Back to Center
+              </Link>
             </div>
             <ul className="table-top-head">
               <li>

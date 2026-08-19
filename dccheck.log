@@ -1,0 +1,38 @@
+﻿
+> cossim-next-frontend@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.21
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.153:3000
+   - Experiments (use with caution):
+     · webVitalsAttribution
+
+ ✓ Starting...
+ ✓ Ready in 2.6s
+ ○ Compiling / ...
+ ✓ Compiled / in 23.4s (963 modules)
+node.exe : <w> [webpack.cache.PackFileCacheStrategy] Skipped not serializable cache item 'Compilation/modules|C:\Users\
+admin\Desktop\Cossim\cossim_web_training\node_modules\next\dist\build\webpack\loaders\css-loader\src\index.js??ruleSet[
+1].rules[14].oneOf[11].use[2]!C:\Users\admin\Desktop\Cossim\cossim_web_training\node_modules\next\dist\build\webpack\lo
+aders\postcss-loader\src\index.js??ruleSet[1].rules[14].oneOf[11].use[3]!C:\Users\admin\Desktop\Cossim\cossim_web_train
+ing\node_modules\next\dist\build\webpack\loaders\resolve-url-loader\index.js??ruleSet[1].rules[14].oneOf[11].use[4]!C:\
+Users\admin\Desktop\Cossim\cossim_web_training\node_modules\next\dist\compiled\sass-loader\cjs.js??ruleSet[1].rules[14]
+.oneOf[11].use[5]!C:\Users\admin\Desktop\Cossim\cossim_web_training\src\style\scss\main.scss': No serializer 
+registered for Warning
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (<w> [webpack.ca...red for Warning:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+<w> while serializing webpack/lib/cache/PackFileCacheStrategy.PackContentItems -> webpack/lib/NormalModule -> Array { 
+2 items } -> webpack/lib/ModuleWarning -> Warning
+ GET / 200 in 848ms
+ ○ Compiling /admin/distribution-centers ...
+ ✓ Compiled /admin/distribution-centers in 42.6s (5410 modules)
+ GET /admin/distribution-centers 200 in 46319ms
+ ○ Compiling /admin/distribution-centers/[id] ...
+ ✓ Compiled /admin/distribution-centers/[id] in 5.3s (5426 modules)
+ GET /admin/distribution-centers/TEST123 200 in 7762ms
+[?25h

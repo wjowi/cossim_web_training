@@ -260,6 +260,16 @@ const PackageDetailPage = () => {
           </div>
 
           <div className="mb-3">
+            <label className="form-label text-muted">Current Location</label>
+            <p>
+              {packageData.LatestLogDCName ||
+                packageData.RouteInfo ||
+                packageData.InitialLogDCName ||
+                "N/A"}
+            </p>
+          </div>
+
+          <div className="mb-3">
             <label className="form-label text-muted">Package Description</label>
             <p>
               {packageData.Notes ||
@@ -345,6 +355,16 @@ const PackageDetailPage = () => {
             <Badge bg={packageData.HasPickUp ? "success" : "secondary"}>
               {packageData.HasPickUp ? "Yes" : "No"}
             </Badge>
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label text-muted">Rider</label>
+            <p>{packageData.RiderName || "N/A"}</p>
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label text-muted">Sales Agent</label>
+            <p>{packageData.SalesAgent || "N/A"}</p>
           </div>
         </Col>
       </Row>

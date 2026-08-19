@@ -130,15 +130,15 @@ export const useAdmin = (initialParams = {}) => {
 
         const response = await getDistributionCenters(queryParams);
         // Extract the Data array from the response structure
-        setDistributionCenters(response.Data || []);
+        setDistributionCenters(response?.Data || []);
 
         // Update pagination if response contains pagination info
-        if (response.TotalPages) {
+        if (response?.TotalPages) {
           setPagination({
-            currentPage: response.PageNO || 1,
-            totalPages: response.TotalPages || 0,
-            totalItems: response.TotalCount || 0,
-            pageSize: response.PageSize || 100,
+            currentPage: response?.PageNO || 1,
+            totalPages: response?.TotalPages || 0,
+            totalItems: response?.TotalCount || 0,
+            pageSize: response?.PageSize || 100,
           });
         }
 

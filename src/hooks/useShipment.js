@@ -216,14 +216,14 @@ export const useShipment = (initialParams = {}) => {
         const response = await getShipmentOrders(queryParams);
 
         // Set shipment orders from Data array
-        setShipmentOrders(response.Data || response.data || []);
+        setShipmentOrders(response?.Data || response?.data || []);
 
         // Set pagination info from response
         setPagination({
-          currentPage: response.PageNO || 1,
-          totalPages: response.TotalPages || 0,
-          totalItems: response.TotalCount || 0,
-          pageSize: response.PageSize || 100,
+          currentPage: response?.PageNO || 1,
+          totalPages: response?.TotalPages || 0,
+          totalItems: response?.TotalCount || 0,
+          pageSize: response?.PageSize || 100,
         });
 
         return response;
@@ -377,7 +377,7 @@ export const useShipment = (initialParams = {}) => {
 
         const response = await getShipmentOrderStatus(effectiveParams);
         // The API returns the list in response.Data.items based on the provided sample
-        const statuses = response.Data?.items || response.data?.items || [];
+        const statuses = response?.Data?.items || response?.data?.items || [];
         setOrderStatuses(statuses);
 
         return response;

@@ -40,6 +40,18 @@ const getStatusName = (status) =>
   status?.Name ||
   "";
 
+const getStatusBadgeClass = (statusCode) => {
+  const code = Number(statusCode);
+  if ([202, 302, 503, 603, 804, 901].includes(code)) return "badge bg-success";
+  if ([303, 805, 902].includes(code)) return "badge bg-danger";
+  if ([201, 301, 501, 602, 702].includes(code)) return "badge bg-warning text-dark";
+  if ([102, 209, 402, 502, 601, 703, 801].includes(code)) return "badge bg-info";
+  if ([101, 208, 401, 701, 802].includes(code)) return "badge bg-primary";
+  if ([103, 304, 410, 803, 903].includes(code)) return "badge bg-dark";
+  if ([207, 504].includes(code)) return "badge bg-light text-dark";
+  return "badge bg-secondary";
+};
+
 const getVendorCode = (vendor) =>
   vendor?.vendorCode ||
   vendor?.VendorCode ||
@@ -134,12 +146,13 @@ const getPackageQueryFilters = () => {
     fromDCCode: params.get("fromDCCode") || "",
     toDCCode: params.get("toDCCode") || "",
     onlyActive: params.get("onlyActive") === "true",
+    task: params.get("task") || "",
     startDate: parsePackageFilterDate(params.get("startDate")),
     endDate: parsePackageFilterDate(params.get("endDate")),
   };
 };
 
-const PackagesList = ({ initialStatusName = "" }) => {
+const PackagesList = ({ initialStatusName = "", initialTask = "dispatch" }) => {
   const route = all_routes;
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
@@ -157,7 +170,9 @@ const PackagesList = ({ initialStatusName = "" }) => {
   const searchTimeoutRef = useRef(null);
 
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-  const [activeTask, setActiveTask] = useState("dispatch");
+  const [activeTask, setActiveTask] = useState(
+    ["dispatch", "receive", "return"].includes(initialTask) ? initialTask : "dispatch"
+  );
 
   // Sticker download hook
   const { showSizeSelectionModal, showBulkSizeSelectionModal, isGenerating } = useStickerDownload();
@@ -183,28 +198,35 @@ const PackagesList = ({ initialStatusName = "" }) => {
     fetchDistributionCenters,
   } = useAdmin();
 
+  // Cached responses can briefly expose the full API envelope instead of its
+  // Data array. Keep rendering resilient while the fresh request replaces it.
+  const shipmentOrderList = Array.isArray(shipmentOrders) ? shipmentOrders : [];
+  const orderStatusList = Array.isArray(orderStatuses) ? orderStatuses : [];
+  const vendorList = Array.isArray(vendors) ? vendors : [];
+  const distributionCenterList = Array.isArray(distributionCenters) ? distributionCenters : [];
+
   const taskCounts = useMemo(() => ({
-    dispatch: (shipmentOrders || []).filter((order) => getTaskType(order) === "dispatch").length,
-    receive: (shipmentOrders || []).filter((order) => getTaskType(order) === "receive").length,
-    return: (shipmentOrders || []).filter((order) => getTaskType(order) === "return").length,
-  }), [shipmentOrders]);
+    dispatch: shipmentOrderList.filter((order) => getTaskType(order) === "dispatch").length,
+    receive: shipmentOrderList.filter((order) => getTaskType(order) === "receive").length,
+    return: shipmentOrderList.filter((order) => getTaskType(order) === "return").length,
+  }), [shipmentOrderList]);
   const taskOrders = useMemo(
-    () => (shipmentOrders || [])
+    () => shipmentOrderList
       .filter((order) => getTaskType(order) === activeTask)
       .sort((a, b) => {
         const slaDifference = getOrderSlaState(a).priority - getOrderSlaState(b).priority;
         return slaDifference || getOrderAgeDays(b.DateAdded) - getOrderAgeDays(a.DateAdded);
       }),
-    [shipmentOrders, activeTask]
+    [shipmentOrderList, activeTask]
   );
   const selectedOrdersForActions = useMemo(
-    () => (shipmentOrders || []).filter((order) => selectedRowKeys.includes(order.OrderNO)),
-    [shipmentOrders, selectedRowKeys]
+    () => shipmentOrderList.filter((order) => selectedRowKeys.includes(order.OrderNO)),
+    [shipmentOrderList, selectedRowKeys]
   );
 
   const statusOptions = useMemo(
     () =>
-      orderStatuses
+      orderStatusList
         .map((status) => {
           const statusName = getStatusName(status);
           return statusName
@@ -215,12 +237,12 @@ const PackagesList = ({ initialStatusName = "" }) => {
             : null;
         })
         .filter(Boolean),
-    [orderStatuses]
+    [orderStatusList]
   );
 
   const vendorOptions = useMemo(
     () =>
-      vendors
+      vendorList
         .map((vendor) => {
           const code = getVendorCode(vendor);
           return code
@@ -231,12 +253,12 @@ const PackagesList = ({ initialStatusName = "" }) => {
             : null;
         })
         .filter(Boolean),
-    [vendors]
+    [vendorList]
   );
 
   const dcOptions = useMemo(
     () =>
-      distributionCenters
+      distributionCenterList
         .map((dc) => {
           const code = getDCCode(dc);
           return code
@@ -247,7 +269,7 @@ const PackagesList = ({ initialStatusName = "" }) => {
             : null;
         })
         .filter(Boolean),
-    [distributionCenters]
+    [distributionCenterList]
   );
 
   const buildShipmentOrderParams = (overrides = {}) => ({
@@ -277,6 +299,12 @@ const PackagesList = ({ initialStatusName = "" }) => {
     const selectedInitialStatus = initialStatusName || queryFilters.statusName || "";
     const querySearchTerm = selectedInitialStatus || queryFilters.searchTerm || "";
 
+    setActiveTask(
+      ["dispatch", "receive", "return"].includes(queryFilters.task)
+        ? queryFilters.task
+        : (["dispatch", "receive", "return"].includes(initialTask) ? initialTask : "dispatch")
+    );
+
     setSearchTerm(queryFilters.searchTerm || "");
     setSelectedStatusName(selectedInitialStatus);
     setVendorCode(queryFilters.vendorCode || "");
@@ -300,9 +328,12 @@ const PackagesList = ({ initialStatusName = "" }) => {
       sortDir: "ASC",
     };
     updateParams(initialParams);
-    fetchShipmentOrders(initialParams);
-    fetchShipmentOrderStatus();
-    fetchDistributionCenters({ pageNo: 1, pageSize: 500 });
+    // Each hook already records its own error state. Consume rejected requests
+    // here so an offline/cache miss cannot escape the effect and trip Next's
+    // global error boundary.
+    fetchShipmentOrders(initialParams).catch(() => {});
+    fetchShipmentOrderStatus().catch(() => {});
+    fetchDistributionCenters({ pageNo: 1, pageSize: 500 }).catch(() => {});
 
     return () => {
       if (searchTimeoutRef.current) {
@@ -324,7 +355,7 @@ const PackagesList = ({ initialStatusName = "" }) => {
     } catch (error) {
       console.error('Error fetching all data for export:', error);
       // Fallback to current page data if fetch fails
-      return shipmentOrders || [];
+      return shipmentOrderList;
     }
   };
 
@@ -439,7 +470,7 @@ const PackagesList = ({ initialStatusName = "" }) => {
   };
 
   // Handle bulk update status modal
-  const selectedOrders = (shipmentOrders || []).filter(order => selectedRowKeys.includes(order.OrderNO));
+  const selectedOrders = shipmentOrderList.filter(order => selectedRowKeys.includes(order.OrderNO));
 
   const handleBulkUpdateStatus = () => {
     if (selectedOrders.length === 0) return;
@@ -472,7 +503,7 @@ const PackagesList = ({ initialStatusName = "" }) => {
 
   // Handle bulk download stickers
   const handleBulkDownloadStickers = () => {
-    const selectedPackages = (shipmentOrders || []).filter(order => selectedRowKeys.includes(order.OrderNO));
+    const selectedPackages = shipmentOrderList.filter(order => selectedRowKeys.includes(order.OrderNO));
     if (selectedPackages.length === 0) return;
 
     showBulkSizeSelectionModal(selectedPackages);
@@ -633,42 +664,6 @@ const PackagesList = ({ initialStatusName = "" }) => {
     }
   };
 
-  const getStatusBadgeClass = (statusCode) => {
-    const code = String(statusCode || "").toUpperCase();
-
-    const statusClasses = {
-      ORDER_CONFIRMED: "badge bg-primary",
-      PICKED_BY_COURIER: "badge bg-info text-dark",
-      RECEIVED_AT_DC: "badge bg-warning text-dark",
-      IN_TRANSIT_TO_DC: "badge bg-primary",
-
-      ASSIGNED_TO_RIDER: "badge bg-secondary",
-      OUT_FOR_DELIVERY: "badge bg-info text-dark",
-      DELIVERED: "badge bg-success",
-      RESCHEDULED: "badge bg-warning text-dark",
-      DELIVERY_ATTEMPT_2: "badge bg-warning text-dark",
-      DELIVERY_ATTEMPT_3: "badge bg-danger",
-      RE_ASSIGNED: "badge bg-secondary",
-
-      RETURN_IN_TRANSIT: "badge bg-warning text-dark",
-      RETURNED_TO_VENDOR: "badge bg-dark",
-
-      PAYMENT_PENDING: "badge bg-warning text-dark",
-      PAYMENT_RECEIVED: "badge bg-success",
-      PAYMENT_FAILED: "badge bg-danger",
-      PAYMENT_WAIVED: "badge bg-secondary",
-
-      ACCEPTED: "badge bg-success",
-      DECLINED: "badge bg-danger",
-
-      EXPRESS: "badge bg-danger",
-      NEXT_DAY: "badge bg-info text-dark",
-      SAME_DAY_CONSOLIDATED: "badge bg-primary",
-    };
-
-    return statusClasses[code] || "badge bg-secondary";
-  };
-
   const formatAmount = (value) => {
     const amount = Number(value || 0);
 
@@ -685,60 +680,42 @@ const PackagesList = ({ initialStatusName = "" }) => {
     return Number.isNaN(date.getTime()) ? null : date;
   };
 
+  // Aging = days the order has stayed in the DC since it was added to the system.
+  const getAgingDays = (dateAddedValue) => {
+    const date = formatPackageDate(dateAddedValue);
+    if (!date) return null;
+
+    return Math.max(0, Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)));
+  };
+
+  const formatAgingLabel = (days) => {
+    if (days === null) return "-";
+    if (days === 0) return "Today";
+    return days === 1 ? "1 day" : `${days} days`;
+  };
+
   const columns = [
     {
       title: "Order NO",
       dataIndex: "OrderNO",
-      width: 165,
+      width: 180,
       fixed: "left",
       sorter: (a, b) =>
         getDisplayText(a.OrderNO).localeCompare(getDisplayText(b.OrderNO)),
-      render: (text) => (
-        <TruncatedText
-          value={text}
-          className="fw-semibold text-primary"
-        />
-      ),
-    },
-    {
-      title: "Delivery Type",
-      dataIndex: "DeliveryType",
-      width: 125,
-      sorter: (a, b) =>
-        getDisplayText(a.DeliveryType).localeCompare(
-          getDisplayText(b.DeliveryType)
-        ),
-      render: (text) => (
-        <span className="badge bg-light text-dark border">
-          {getDisplayText(text)}
-        </span>
-      ),
-    },
-    {
-      title: "Sender",
-      dataIndex: "VendorName",
-      width: 180,
-      sorter: (a, b) =>
-        getDisplayText(a.VendorName).localeCompare(
-          getDisplayText(b.VendorName)
-        ),
-      render: (_, record) => (
+      render: (text, record) => (
         <div className="packages-person-cell">
+          <TruncatedText value={text} className="fw-semibold text-primary" />
           <TruncatedText
-            value={record.VendorName || record.SenderCompanyName}
-            className="fw-medium"
-          />
-          <TruncatedText
-            value={record.VendorPhone || record.SenderContactPhone}
+            value={record.StatusName || record.StatusCode}
             className="text-muted small"
           />
         </div>
       ),
     },
     {
-      title: "Receiver",
+      title: "Customer",
       dataIndex: "ReceiverContactName",
-      width: 180,
+      width: 190,
       sorter: (a, b) =>
         getDisplayText(a.ReceiverContactName).localeCompare(
           getDisplayText(b.ReceiverContactName)
@@ -756,207 +733,39 @@ const PackagesList = ({ initialStatusName = "" }) => {
         </div>
       ),
     },
-   
-   {
-  title: "Route",
-  dataIndex: "OriginDCName",
-  width: 280,
-  sorter: (a, b) => {
-    const originCompare = getDisplayText(
-      a.OriginDCName
-    ).localeCompare(
-      getDisplayText(b.OriginDCName)
-    );
-
-    if (originCompare !== 0) {
-      return originCompare;
-    }
-
-    return getDisplayText(
-      a.DestinationDCName
-    ).localeCompare(
-      getDisplayText(b.DestinationDCName)
-    );
-  },
-  render: (_, record) => (
-    <div className="packages-route-combined-cell">
-      <div className="packages-route-point">
-        <span className="packages-route-label">
-          
-        </span>
-
-        <div className="packages-route-details">
-          <TruncatedText
-            value={record.OriginDCName}
-            className="fw-medium"
-          />
-
-          <TruncatedText
-            value={record.OriginDCCode}
-            className="text-muted small"
-          />
-        </div>
-      </div>
-
-      <div className="packages-route-arrow">
-        <span aria-hidden="true">→</span>
-      </div>
-
-      <div className="packages-route-point">
-        <span className="packages-route-label">
-          
-        </span>
-
-        <div className="packages-route-details">
-          <TruncatedText
-            value={record.DestinationDCName}
-            className="fw-medium"
-          />
-
-          <TruncatedText
-            value={record.DestinationDCCode}
-            className="text-muted small"
-          />
-        </div>
-      </div>
-    </div>
-  ),
-},
     {
-      title: "Current Location",
-      dataIndex: "LatestLogDCName",
-      width: 180,
-      sorter: (a, b) =>
-        getDisplayText(a.LatestLogDCName).localeCompare(
-          getDisplayText(b.LatestLogDCName)
-        ),
-      render: (_, record) => (
-        <div className="packages-person-cell">
-          <TruncatedText
-            value={
-              record.RouteInfo ||
-              record.InitialLogDCName ||
-              record.OriginDCName
-            }
-            className="fw-medium"
-          />
-          {record.RouteInfo && (
-            <TruncatedText
-              value={record.RouteInfo}
-              className="text-muted small"
-            />
-          )}
-        </div>
-      ),
-    },
-    {
-      title: "Service Fee",
-      dataIndex: "ServiceFee",
-      width: 120,
-      align: "right",
-      sorter: (a, b) =>
-        Number(a.ServiceFee || 0) - Number(b.ServiceFee || 0),
-      render: (value) => (
-        <span className="fw-semibold">
-          {formatAmount(value)}
-        </span>
-      ),
-    },
-    {
-      title: "COD",
+      title: "COD Amount",
       dataIndex: "CODAmount",
-      width: 110,
+      width: 130,
       align: "right",
       sorter: (a, b) =>
         Number(a.CODAmount || 0) - Number(b.CODAmount || 0),
-      render: (value, record) => (
-        <div className="packages-amount-cell">
-          <div>{formatAmount(value)}</div>
-          <small className="text-muted">
-            {record.CashOnDeliveryRequired ? "Required" : "Not required"}
-          </small>
-        </div>
-      ),
-    },
-    {
-      title: "Pickup",
-      dataIndex: "HasPickUp",
-      width: 95,
-      align: "center",
-      sorter: (a, b) => Number(a.HasPickUp) - Number(b.HasPickUp),
       render: (value) => (
-        <span
-          className={`badge ${
-            value ? "bg-success" : "bg-secondary"
-          }`}
-        >
-          {value ? "Yes" : "No"}
-        </span>
+        <span className="fw-semibold">{formatAmount(value)}</span>
       ),
     },
     {
       title: "Date Added",
       dataIndex: "DateAdded",
-      width: 145,
-      sorter: (a, b) => {
-        const aDate = formatPackageDate(a.DateAdded);
-        const bDate = formatPackageDate(b.DateAdded);
-
-        return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
-      },
+      width: 150,
+      defaultSortOrder: "descend",
+      sorter: (a, b) =>
+        (getAgingDays(a.DateAdded) ?? -1) - (getAgingDays(b.DateAdded) ?? -1),
       render: (value) => {
         const date = formatPackageDate(value);
+        const aging = getAgingDays(value);
 
         if (!date) return "-";
 
         return (
           <div className="packages-date-cell">
             <div>{date.toLocaleDateString("en-GB")}</div>
-            <small className="text-muted">
-              {date.toLocaleTimeString("en-GB")}
+            <small className={aging >= 7 ? "text-danger fw-semibold" : "text-muted"}>
+              {formatAgingLabel(aging)}
             </small>
           </div>
         );
       },
-    },
-    {
-      title: "Status",
-      dataIndex: "StatusCode",
-      width: 180,
-      sorter: (a, b) =>
-        getDisplayText(a.StatusName).localeCompare(
-          getDisplayText(b.StatusName)
-        ),
-      render: (_, record) => (
-        <span
-          className={`${getStatusBadgeClass(
-            record.StatusCode
-          )} packages-status-badge`}
-          title={record.StatusName || record.StatusCode}
-        >
-          {getDisplayText(record.StatusName || record.StatusCode)}
-        </span>
-      ),
-    },
-    {
-      title: "Rider",
-      dataIndex: "RiderName",
-      width: 130,
-      sorter: (a, b) =>
-        getDisplayText(a.RiderName).localeCompare(
-          getDisplayText(b.RiderName)
-        ),
-      render: (text) => <TruncatedText value={text} />,
-    },
-    {
-      title: "Sales Agent",
-      dataIndex: "SalesAgent",
-      width: 145,
-      sorter: (a, b) =>
-        getDisplayText(a.SalesAgent).localeCompare(
-          getDisplayText(b.SalesAgent)
-        ),
-      render: (text) => <TruncatedText value={text} />,
     },
     {
       title: "Action",
@@ -1192,7 +1001,7 @@ const PackagesList = ({ initialStatusName = "" }) => {
         <ul className="table-top-head">
           {/* Export Icons - PDF and Excel */}
           <TableExportIcons
-            data={shipmentOrders}
+            data={shipmentOrderList}
             columns={columns}
             pdfColumns={pdfColumns}
             excelColumns={exportColumns}
@@ -1729,18 +1538,6 @@ const PackagesList = ({ initialStatusName = "" }) => {
         .packages-date-cell {
           line-height: 1.35;
           white-space: nowrap;
-        }
-
-        .packages-status-badge {
-          display: inline-block;
-          max-width: 135px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          vertical-align: middle;
-          white-space: nowrap;
-          font-size: 11px;
-          font-weight: 700;
-          padding: 5px 8px;
         }
 
         .packages-table .dropdown-toggle {

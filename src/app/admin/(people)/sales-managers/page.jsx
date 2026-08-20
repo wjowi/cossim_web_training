@@ -208,6 +208,7 @@ const SalesManagersList = () => {
                 <Datatable
                   columns={columns}
                   dataSource={usersByRole}
+                  rowKey="UserCode"
                   pagination={{
                     current: pagination.currentPage || currentPage,
                     pageSize: pagination.pageSize || pageSize,

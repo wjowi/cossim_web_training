@@ -3,10 +3,10 @@ import * as Icon from "react-feather";
 
 export const SidebarData = [
   {
-    label: "Overview",
+    label: "Dashboard",
     submenuOpen: true,
-    submenuHdr: "Overview",
-    collapsible: false,
+    submenuHdr: "Dashboard",
+    icon: <Icon.Grid />,
     submenuItems: [
       {
         label: "Dashboard",
@@ -22,6 +22,7 @@ export const SidebarData = [
     label: "Operations",
     submenuOpen: true,
     submenuHdr: "Operations",
+    icon: <Icon.Package />,
     submenuItems: [
       {
         label: "Task Management",
@@ -40,14 +41,6 @@ export const SidebarData = [
         description: "Handover Batch Management",
       },
       {
-        label: "Distribution Centers",
-        icon: <Icon.Home />,
-        link: "/admin/distribution-centers",
-        showSubRoute: false,
-        submenu: false,
-        description: "DC Management",
-      },
-      {
         label: "Inventory",
         icon: <Icon.Clipboard />,
         link: "/admin/inventory",
@@ -58,40 +51,10 @@ export const SidebarData = [
     ],
   },
   {
-    label: "Vendors",
-    submenuOpen: true,
-    submenuHdr: "Vendors",
-    submenuItems: [
-      {
-        label: "Vendors",
-        icon: <Icon.Users />,
-        link: "/admin/vendors",
-        showSubRoute: false,
-        submenu: false,
-        description: "Vendor Management",
-      },
-      {
-        label: "Statements",
-        icon: <Icon.FileText />,
-        link: "/admin/vendor-statements",
-        showSubRoute: false,
-        submenu: false,
-        description: "Vendor Statements",
-      },
-      {
-        label: "Payments",
-        icon: <Icon.CreditCard />,
-        link: "/admin/cod-payments",
-        showSubRoute: false,
-        submenu: false,
-        description: "Vendor Payments",
-      }
-    ],
-  },
-  {
     label: "People",
     submenuOpen: true,
     submenuHdr: "People",
+    icon: <Icon.Users />,
     submenuItems: [
       {
         label: "Users",
@@ -117,20 +80,13 @@ export const SidebarData = [
         submenu: false,
         description: "Manager Assignments",
       },
-      {
-        label: "Riders",
-        icon: <Icon.Truck />, // react-feather does not have Bike, Truck is closest
-        link: "/admin/riders",
-        showSubRoute: false,
-        submenu: false,
-        description: "Delivery Team",
-      }
     ],
   },
   {
     label: "Finance",
     submenuOpen: true,
     submenuHdr: "Finance",
+    icon: <Icon.DollarSign />,
     submenuItems: [
       {
         label: "Summary",
@@ -139,6 +95,22 @@ export const SidebarData = [
         showSubRoute: false,
         submenu: false,
         description: "Financial Overview",
+      },
+      {
+        label: "Statements",
+        icon: <Icon.FileText />,
+        link: "/admin/vendor-statements",
+        showSubRoute: false,
+        submenu: false,
+        description: "Vendor Statements",
+      },
+      {
+        label: "Payments",
+        icon: <Icon.CreditCard />,
+        link: "/admin/cod-payments",
+        showSubRoute: false,
+        submenu: false,
+        description: "Vendor Payments",
       },
       {
         label: "Reconciliation",
@@ -170,6 +142,7 @@ export const SidebarData = [
     label: "Reports",
     submenuOpen: true,
     submenuHdr: "Reports",
+    icon: <Icon.BarChart2 />,
     submenuItems: [
       {
         label: "Tracking Analytics",
@@ -182,17 +155,83 @@ export const SidebarData = [
     ],
   },
   {
-    label: "Configuration",
+    label: "Settings",
     submenuOpen: true,
-    submenuHdr: "Configuration",
+    submenuHdr: "Settings",
+    icon: <Icon.Settings />,
     submenuItems: [
       {
-        label: "Couriers",
-        icon: <Icon.Truck />,
-        link: "/admin/couriers",
+        label: "Setup",
+        icon: <Icon.Sliders />,
+        showSubRoute: true,
+        submenu: true,
+        description: "System & Master Data Setup",
+        submenuItems: [
+          {
+            label: "General",
+            icon: <Icon.Settings />,
+            link: "/admin/settings",
+            showSubRoute: false,
+            submenu: false,
+            description: "General Settings",
+          },
+          {
+            label: "User Roles",
+            icon: <Icon.Bell />,
+            link: "/admin/settings/user-roles",
+            showSubRoute: false,
+            submenu: false,
+            description: "User Roles Management",
+          },
+          {
+            label: "Order Statuses",
+            icon: <Icon.List />,
+            link: "/admin/settings/order-statuses",
+            showSubRoute: false,
+            submenu: false,
+            description: "Shipment Order Status Management",
+          },
+          {
+            label: "Couriers",
+            icon: <Icon.Truck />,
+            link: "/admin/couriers",
+            showSubRoute: false,
+            submenu: false,
+            description: "Courier Management",
+          },
+          {
+            label: "Vendors",
+            icon: <Icon.Users />,
+            link: "/admin/vendors",
+            showSubRoute: false,
+            submenu: false,
+            description: "Vendor Management",
+          },
+          {
+            label: "Distribution Centers",
+            icon: <Icon.Home />,
+            link: "/admin/distribution-centers",
+            showSubRoute: false,
+            submenu: false,
+            description: "DC Management",
+          },
+          {
+            label: "Riders",
+            icon: <Icon.Truck />,
+            link: "/admin/riders",
+            showSubRoute: false,
+            submenu: false,
+            description: "Delivery Team",
+          },
+        ],
+      },
+      {
+        label: "Profile",
+        icon: <Icon.User />,
+        link: "/admin/profile",
         showSubRoute: false,
         submenu: false,
-        description: "Courier Management",
+        description: "Admin Profile",
       },
       {
         label: "SMS",
@@ -209,45 +248,6 @@ export const SidebarData = [
         showSubRoute: false,
         submenu: false,
         description: "Terms & Privacy",
-      },
-      {
-        label: "Profile",
-        icon: <Icon.User />,
-        link: "/admin/profile",
-        showSubRoute: false,
-        submenu: false,
-        description: "Admin Profile",
-      },
-    ],
-  },
-  {
-    label: "Settings",
-    submenuOpen: true,
-    submenuHdr: "Settings",
-    submenuItems: [
-      {
-        label: "General",
-        icon: <Icon.Settings />,
-        link: "/admin/settings",
-        showSubRoute: false,
-        submenu: false,
-        description: "General Settings",
-      },
-      {
-        label: "User Roles",
-        icon: <Icon.Bell />,
-        link: "/admin/settings/user-roles",
-        showSubRoute: false,
-        submenu: false,
-        description: "User Roles Management",
-      },
-      {
-        label: "Order Statuses",
-        icon: <Icon.List />,
-        link: "/admin/settings/order-statuses",
-        showSubRoute: false,
-        submenu: false,
-        description: "Shipment Order Status Management",
       },
     ],
   },

@@ -1,6 +1,7 @@
 import React from 'react'
 import Header from '@/components/Sidebar/Header'
 import Sidebar from '@/components/Sidebar/Sidebar'
+import SectionTabBar from '@/components/Sidebar/SectionTabBar'
 import AuthGuard from '@/components/AuthGuard'
 import RoleGuard from '@/components/RoleGuard'
 import { RoleType } from '@/constants/user-roles'
@@ -9,10 +10,10 @@ import PropTypes from 'prop-types'
 export default function DashboardLayout({ children }) {
   return (
     <AuthGuard requireAuth={true}>
-      <RoleGuard 
+      <RoleGuard
         allowedRoles={[
-          RoleType.ADMIN, 
-          RoleType.FINANCE, 
+          RoleType.ADMIN,
+          RoleType.FINANCE,
           RoleType.SALES_MANAGER
         ]}
       >
@@ -20,6 +21,7 @@ export default function DashboardLayout({ children }) {
             <Header />
             <Sidebar />
             <div className="page-wrapper">
+              <SectionTabBar />
               {children}
             </div>
           </div>

@@ -4,20 +4,20 @@ import { usePathname } from "next/navigation";
 import Link from "@/components/Link";
 import { SidebarData } from "@/core/data/siderbar_data";
 
-// Returns the nested subgroup (e.g. "Setup") if the active page lives inside one,
-// otherwise the top-level group that directly links to the active page.
-const findActiveGroup = (pathname) => {
-  for (const group of SidebarData) {
-    for (const item of group.submenuItems || []) {
-      if (item.submenu) {
-        const nestedLinks = (item.submenuItems || []).map((sub) => sub.link).filter(Boolean);
-        if (nestedLinks.includes(pathname)) return item;
-      } else if (item.link === pathname) {
-        return group;
-      }
-    }
+const flattenLinks = (items = []) =>
+  items.flatMap((item) => [item.link, ...flattenLinks(item.submenuItems)]).filter(Boolean);
+
+// Always resolves to the top-level group, even if the active page is nested
+// inside a subgroup (e.g. Setup) — so the tab bar stays put (Setup, Profile,
+// SMS, Policies) no matter which Setup page you're on.
+const findActiveGroup = (pathname) =>
+  SidebarData.find((group) => flattenLinks(group.submenuItems).includes(pathname)) || null;
+
+const isTabActive = (item, pathname) => {
+  if (item.submenu) {
+    return item.link === pathname || flattenLinks(item.submenuItems).includes(pathname);
   }
-  return null;
+  return item.link === pathname;
 };
 
 const SectionTabBar = () => {
@@ -35,7 +35,7 @@ const SectionTabBar = () => {
           <Link
             key={item.label}
             to={item.link}
-            className={`section-tab-bar-tab ${pathname === item.link ? "active" : ""}`}
+            className={`section-tab-bar-tab ${isTabActive(item, pathname) ? "active" : ""}`}
           >
             {item.label}
           </Link>

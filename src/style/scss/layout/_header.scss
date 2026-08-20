@@ -317,6 +317,20 @@
 .logo-small img {
     width: 30px;
 }
+.logo-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, $primary 0%, $primary-600 100%);
+    color: $white;
+    font-size: 16px;
+    font-weight: $font-weight-bold;
+    line-height: 1;
+    box-shadow: 0 4px 10px rgba($primary, 0.3);
+}
 @include respond-above(custom992) {
     .mini-sidebar{
         &.expand-menu{

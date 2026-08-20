@@ -463,13 +463,8 @@ const Header = () => {
           </span>
         </Link>
         <Link to={logoRoute} className="logo-small">
-          <span className="logo-icon" style={{ fontSize: "1.5rem", fontWeight: "bold" }}>
-            <ImageWithBasePath
-              src="assets/logo/logo.png"
-              alt="Logo"
-              width={40}
-              height={40}
-            />
+          <span className="logo-badge" aria-label="COSSIM">
+            C
           </span>
         </Link>
         <Link

@@ -1,6 +1,7 @@
 import React from 'react'
 import Header from '@/components/Sidebar/Header'
 import Sidebar from '@/components/Sidebar/Sidebar'
+import ContextSidebar from '@/components/Sidebar/ContextSidebar'
 import SectionTabBar from '@/components/Sidebar/SectionTabBar'
 import AuthGuard from '@/components/AuthGuard'
 import RoleGuard from '@/components/RoleGuard'
@@ -20,6 +21,7 @@ export default function DashboardLayout({ children }) {
         <div className={`main-wrapper`}>
             <Header />
             <Sidebar />
+            <ContextSidebar />
             <div className="page-wrapper">
               <SectionTabBar />
               {children}

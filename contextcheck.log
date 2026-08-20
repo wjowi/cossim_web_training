@@ -1,0 +1,51 @@
+﻿
+> cossim-next-frontend@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.21
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.153:3000
+   - Experiments (use with caution):
+     · webVitalsAttribution
+
+ ✓ Starting...
+ ✓ Ready in 2.1s
+ ○ Compiling /admin/settings/user-roles ...
+ ✓ Compiled / in 27.2s (4655 modules)
+ GET /admin/settings/user-roles 200 in 28427ms
+ GET /admin/settings/user-roles 200 in 184ms
+ GET / 200 in 427ms
+ GET /admin/settings/user-roles 200 in 2084ms
+node.exe : <w> [webpack.cache.PackFileCacheStrategy] Skipped not serializable cache item 'Compilation/modules|C:\Users\
+admin\Desktop\Cossim\cossim_web_training\node_modules\next\dist\build\webpack\loaders\css-loader\src\index.js??ruleSet[
+1].rules[14].oneOf[11].use[2]!C:\Users\admin\Desktop\Cossim\cossim_web_training\node_modules\next\dist\build\webpack\lo
+aders\postcss-loader\src\index.js??ruleSet[1].rules[14].oneOf[11].use[3]!C:\Users\admin\Desktop\Cossim\cossim_web_train
+ing\node_modules\next\dist\build\webpack\loaders\resolve-url-loader\index.js??ruleSet[1].rules[14].oneOf[11].use[4]!C:\
+Users\admin\Desktop\Cossim\cossim_web_training\node_modules\next\dist\compiled\sass-loader\cjs.js??ruleSet[1].rules[14]
+.oneOf[11].use[5]!C:\Users\admin\Desktop\Cossim\cossim_web_training\src\style\scss\main.scss': No serializer 
+registered for Warning
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (<w> [webpack.ca...red for Warning:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+<w> while serializing webpack/lib/cache/PackFileCacheStrategy.PackContentItems -> webpack/lib/NormalModule -> Array { 
+2 items } -> webpack/lib/ModuleWarning -> Warning
+ GET /admin/settings/user-roles 200 in 1716ms
+ GET /admin/settings/user-roles 200 in 309ms
+ ○ Compiling /admin/dashboard ...
+ ✓ Compiled /admin/dashboard in 10.4s (6108 modules)
+ GET /admin/dashboard 200 in 12149ms
+ GET /admin/settings/user-roles 200 in 11676ms
+ ○ Compiling /admin/settings ...
+ ✓ Compiled /admin/settings in 1299ms (6138 modules)
+ GET /admin/settings 200 in 1982ms
+ GET /admin/settings/user-roles 200 in 608ms
+ ○ Compiling /admin/profile ...
+ ✓ Compiled /admin/profile in 1093ms (6183 modules)
+ GET /admin/profile 200 in 1552ms
+ ○ Compiling /admin/packages ...
+ ✓ Compiled /admin/packages in 987ms (6188 modules)
+ GET /admin/packages 200 in 2696ms
+[?25h

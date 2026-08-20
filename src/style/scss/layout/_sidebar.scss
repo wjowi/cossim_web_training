@@ -1116,73 +1116,6 @@ body.mini-sidebar{
     }
 }
 
-.sidebar-flyout-subgroup {
-    display: flex;
-    flex-direction: column;
-}
-
-.sidebar-flyout-subgroup-toggle {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    border: none;
-    background: transparent;
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: $font-size-14;
-    font-weight: $font-weight-medium;
-    color: $gray-600;
-    cursor: pointer;
-    @include transition(all 0.2s ease);
-
-    .sidebar-icon {
-        display: inline-flex;
-        color: $gray-500;
-    }
-
-    .sidebar-label {
-        flex: 1 1 auto;
-        text-align: left;
-    }
-
-    .sidebar-flyout-subgroup-chevron {
-        flex: 0 0 auto;
-        color: $gray-500;
-        @include transition(transform 0.2s ease);
-    }
-
-    &:hover {
-        background: rgba($primary, 0.06);
-        color: $primary;
-
-        .sidebar-icon,
-        .sidebar-flyout-subgroup-chevron {
-            color: $primary;
-        }
-    }
-
-    &.active {
-        color: $primary;
-        font-weight: $font-weight-semibold;
-
-        .sidebar-icon {
-            color: $primary;
-        }
-    }
-
-    &.open .sidebar-flyout-subgroup-chevron {
-        transform: rotate(180deg);
-    }
-}
-
-.sidebar-flyout-subgroup-body {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 2px 0 4px;
-}
-
 // Top-of-page section tab bar (mirrors the active sidebar group's items as pill buttons)
 .section-tab-bar {
     display: flex;
@@ -1242,5 +1175,142 @@ body.mini-sidebar{
         color: $white !important;
         font-weight: $font-weight-semibold;
         box-shadow: 0 4px 12px rgba($primary, 0.25);
+    }
+}
+
+// Persistent context sidebar: shows Setup's own items as a collapsible side
+// panel next to the main sidebar, triggered from the Settings tab bar's
+// "Setup" pill or by visiting any page inside it.
+.context-sidebar {
+    position: fixed;
+    top: 66px;
+    left: 260px;
+    width: 270px;
+    height: calc(100vh - 66px);
+    background: $white;
+    border-right: 1px solid rgba($gray-300, 0.6);
+    overflow-y: auto;
+    z-index: 998;
+    @include transition(left 0.3s ease);
+
+    @include respond-below(custom991) {
+        display: none;
+    }
+}
+
+body.mini-sidebar .context-sidebar {
+    left: 80px;
+}
+
+body.has-context-sidebar .page-wrapper {
+    margin-left: 530px;
+
+    @include respond-below(custom991) {
+        margin-left: 0;
+    }
+}
+
+body.mini-sidebar.has-context-sidebar .page-wrapper {
+    @include respond-above(custom991) {
+        margin-left: 350px;
+    }
+}
+
+.context-sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 16px;
+    border: none;
+    background: rgba($primary, 0.05);
+    border-bottom: 1px solid rgba($gray-300, 0.6);
+    cursor: pointer;
+    text-align: left;
+
+    svg {
+        flex: 0 0 auto;
+        color: $gray-500;
+        @include transition(transform 0.2s ease);
+
+        &.collapsed {
+            transform: rotate(-90deg);
+        }
+    }
+}
+
+.context-sidebar-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: $primary;
+    flex: 0 0 auto;
+}
+
+.context-sidebar-title {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+}
+
+.context-sidebar-label {
+    font-weight: $font-weight-bold;
+    font-size: $font-size-14;
+    color: #1B2950;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.context-sidebar-count {
+    font-size: 11px;
+    color: $gray-500;
+}
+
+.context-sidebar-body {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.context-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    color: $gray-600;
+    font-size: $font-size-14;
+    font-weight: $font-weight-medium;
+    text-decoration: none !important;
+    @include transition(all 0.2s ease);
+
+    .context-sidebar-item-icon {
+        display: inline-flex;
+        align-items: center;
+        color: $gray-500;
+        flex: 0 0 auto;
+    }
+
+    &:hover {
+        background: rgba($primary, 0.06);
+        color: $primary !important;
+
+        .context-sidebar-item-icon {
+            color: $primary;
+        }
+    }
+
+    &.active {
+        background: linear-gradient(135deg, $primary 0%, $primary-600 100%);
+        color: $white !important;
+        font-weight: $font-weight-semibold;
+        box-shadow: 0 4px 12px rgba($primary, 0.2);
+
+        .context-sidebar-item-icon {
+            color: $white;
+        }
     }
 }

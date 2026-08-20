@@ -163,6 +163,7 @@ export const SidebarData = [
       {
         label: "Setup",
         icon: <Icon.Sliders />,
+        link: "/admin/settings",
         showSubRoute: true,
         submenu: true,
         description: "System & Master Data Setup",
